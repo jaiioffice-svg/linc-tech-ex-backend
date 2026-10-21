@@ -1,6 +1,8 @@
 const fs = require('fs');
 const path = require('path');
-const DB_FILE = path.join(__dirname, 'linc_data.json');
+// Temporary Vercel Preview storage only. /tmp is ephemeral and is not suitable
+// for production data; migrate this module to Supabase/Postgres before release.
+const DB_FILE = path.join('/tmp', 'linc_data.json');
 
 if (!fs.existsSync(DB_FILE)) {
     fs.writeFileSync(DB_FILE, JSON.stringify({ schools: {}, users: {}, revenue: { total: 0 } }, null, 2));
