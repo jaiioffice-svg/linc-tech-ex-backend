@@ -1,31 +1,41 @@
-const { readDB, writeDB } = require('./db');
+const { getStaleActiveUsers, getUser, saveUser } = require('./db');
 
-function startHeartbeatMonitor(triggerAlertCallback) {
-    setInterval(() => {
-        try {
-            const db = readDB();
-            const now = Date.now();
-            const ONEDAY_MS = 24 * 60 * 60 * 1000; 
+async function runHeartbeatCheck(triggerAlertCallback, now = Date.now()) {
+    const oneDayMs = 24 * 60 * 60 * 1000;
+    const staleUsers = await getStaleActiveUsers(now - oneDayMs);
+    let markedMissing = 0;
 
-            Object.keys(db.users).forEach(userId => {
-                const user = db.users[userId];
-                
-                if (user.status === 'active' && (now - user.lastHeartbeat) > ONEDAY_MS) {
-                    user.status = 'missing'; 
-                    db.users[userId] = user;
-                    
-                    triggerAlertCallback({
-                        userId: userId,
-                        guardianLineId: user.guardianLineId,
-                        reason: 'SYSTEM_DISCONNECTED_ALERT'
-                    });
-                }
+    for (const user of staleUsers) {
+        // Re-read before writing so a refreshed heartbeat is not overwritten by a stale snapshot.
+        const latest = await getUser(user.userId);
+        if (!latest || latest.status !== 'active' || Number(latest.lastHeartbeat) >= now - oneDayMs) continue;
+
+        latest.status = 'missing';
+        latest.missingSince = now;
+        await saveUser(latest);
+        markedMissing += 1;
+
+        if (typeof triggerAlertCallback === 'function') {
+            triggerAlertCallback({
+                userId: latest.userId,
+                guardianLineId: latest.guardianLineId || null,
+                reason: 'SYSTEM_DISCONNECTED_ALERT'
             });
-            writeDB(db);
-        } catch (error) {
-            console.error('Error running monitor service:', error.message);
         }
-    }, 60 * 60 * 1000); 
+    }
+
+    return { checked: staleUsers.length, markedMissing };
 }
 
-module.exports = { startHeartbeatMonitor };
+function startHeartbeatMonitor(triggerAlertCallback) {
+    const interval = 60 * 60 * 1000;
+    const timer = setInterval(() => {
+        runHeartbeatCheck(triggerAlertCallback).catch(error => {
+            console.error('[HEARTBEAT_MONITOR] run failed', error && error.code ? error.code : 'INTERNAL_ERROR');
+        });
+    }, interval);
+    if (typeof timer.unref === 'function') timer.unref();
+    return timer;
+}
+
+module.exports = { runHeartbeatCheck, startHeartbeatMonitor };
