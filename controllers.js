@@ -8,9 +8,9 @@ function sendError(res, error, action) {
         ? 'Required database service is not configured or is temporarily unavailable'
         : 'Internal server error';
     return res.status(status).json({ success: false, message });
-}
+};
 
-exports.handleHeartbeat = async (req, res) => {
+exports.handleUserRegistration = async (req, res) => {
     try {
         const { userId, grade, guardianLineId } = req.body || {};
         if (typeof userId !== 'string' || !userId.trim()) {
@@ -20,7 +20,6 @@ exports.handleHeartbeat = async (req, res) => {
             return res.status(400).json({ success: false, message: 'Invalid user identifier' });
         }
 
-        const now = Date.now();
         const existingUser = await getUser(userId);
         const user = existingUser || {
             userId,
@@ -28,20 +27,23 @@ exports.handleHeartbeat = async (req, res) => {
             guardianLineId: typeof guardianLineId === 'string' && guardianLineId.trim()
                 ? guardianLineId.trim()
                 : null,
-            createdAt: now
+            createdAt: Date.now(),
+            status: 'active'
         };
 
         if (existingUser && typeof grade === 'string' && grade.trim()) user.grade = grade.trim();
         if (typeof guardianLineId === 'string' && guardianLineId.trim()) {
             user.guardianLineId = guardianLineId.trim();
         }
-        user.lastHeartbeat = now;
-        user.status = 'active';
+        if (!user.status) user.status = 'active';
         await saveUser(user);
 
-        return res.status(200).json({ success: true, message: 'Heartbeat acknowledged' });
+        return res.status(existingUser ? 200 : 201).json({
+            success: true,
+            message: existingUser ? 'User profile updated' : 'User profile registered'
+        });
     } catch (error) {
-        return sendError(res, error, 'HEARTBEAT');
+        return sendError(res, error, 'USER_REGISTRATION');
     }
 };
 
