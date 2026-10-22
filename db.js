@@ -67,7 +67,6 @@ async function supabaseRequest(resource, options = {}) {
     }
 
     if (!response.ok) {
-        // Do not return upstream response bodies: they can reveal schema or service details.
         const error = new Error('Database request failed');
         error.code = 'DB_UNAVAILABLE';
         error.status = response.status;
@@ -86,7 +85,7 @@ function normalizeSupabaseUser(row) {
         grade: row.grade || data.grade || 'M1',
         guardianLineId: row.guardian_line_id ?? data.guardianLineId ?? null,
         createdAt: row.created_at ?? data.createdAt,
-        lastHeartbeat: row.last_heartbeat ?? data.lastHeartbeat,
+        lastHeartbeat: row.last_heartbeat ?? data.lastHeartbeat ?? null,
         status: row.status || data.status
     };
 }
@@ -127,7 +126,7 @@ async function saveUser(user) {
         grade: user.grade || 'M1',
         guardian_line_id: user.guardianLineId || null,
         created_at: user.createdAt || Date.now(),
-        last_heartbeat: user.lastHeartbeat || Date.now(),
+        last_heartbeat: user.lastHeartbeat ?? null,
         status: user.status || 'active',
         data: user,
         updated_at: new Date().toISOString()
@@ -138,21 +137,6 @@ async function saveUser(user) {
         body: JSON.stringify(row)
     });
     return user;
-}
-
-async function getStaleActiveUsers(cutoffTimestamp) {
-    assertDatabaseAvailable();
-    if (!hasSupabaseConfig()) {
-        const state = readLocalState();
-        return Object.values(state.users).filter(
-            user => user.status === 'active' && Number(user.lastHeartbeat) < cutoffTimestamp
-        );
-    }
-
-    const rows = await supabaseRequest(
-        `${SUPABASE_TABLE}?status=eq.active&last_heartbeat=lt.${encodeURIComponent(String(cutoffTimestamp))}&select=user_id,grade,guardian_line_id,created_at,last_heartbeat,status,data`
-    );
-    return rows.map(normalizeSupabaseUser);
 }
 
 function calculateWeightedRevenue(grade, studentCount) {
@@ -174,6 +158,5 @@ module.exports = {
     isDatabaseConfigured,
     getUser,
     saveUser,
-    getStaleActiveUsers,
     calculateWeightedRevenue
 };
