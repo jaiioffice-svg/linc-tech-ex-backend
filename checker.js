@@ -14,7 +14,7 @@ async function runHeartbeatCheck(triggerAlertCallback, now = Date.now()) {
         markedMissing += 1;
 
         if (typeof triggerAlertCallback === 'function') {
-            triggerAlertCallback({
+            await triggerAlertCallback({
                 userId: latest.userId,
                 guardianLineId: latest.guardianLineId || null,
                 reason: 'SYSTEM_DISCONNECTED_ALERT'
