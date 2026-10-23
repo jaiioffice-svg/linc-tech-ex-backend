@@ -12,6 +12,22 @@ Scope: current backend branch `fix/supabase-readiness-diagnostics`.
 - These checks validate dependency install, automated tests, deployment readiness, and database reachability only. They do **not** verify live application-data writes/reads, per-user authentication, ownership enforcement, or guardian notification delivery.
 - The timestamp conversion migration has **not** been applied to the live Supabase database. Verify live column types and existing timestamp semantics first. PR #6 remains open and Draft; do not merge or promote to Production until release blockers are resolved.
 
+## Live Supabase schema inspection (read-only, 2026-10-24)
+
+The project owner ran an `information_schema.columns` query for `public.linc_users` and reported:
+
+| Column | Actual type | Nullable | Default |
+|---|---|---|---|
+| `user_id` | `text` | no | none |
+| `created_at` | `bigint` | no | none |
+| `last_heartbeat` | `bigint` | yes | none |
+| `updated_at` | `timestamp with time zone` | no | `now()` |
+
+- The live column types already match the backend's expected storage types for `created_at` and `last_heartbeat`; no timestamp type conversion is needed based on this schema inspection.
+- The live `created_at` column lacks the epoch-millisecond default defined by the base migration. The backend currently supplies `created_at` explicitly on writes, but aligning the default would make the schema consistent.
+- `last_heartbeat` correctly has no default; `updated_at` correctly uses a timezone-aware timestamp with `now()`.
+- The values' unit/semantics have not yet been verified. Before treating existing values as epoch milliseconds, run a read-only range/format check. Do not run the conversion migration just to convert types that are already correct; if the migration is used to align the default, review its effects first.
+
 ## Current verified state
 
 - GitHub Actions run #55 passed on commit `851a91cc72805cab3e8018b739c7db7c76f115bb`: https://github.com/jaiioffice-svg/linc-tech-ex-backend/actions/runs/40023218385.
