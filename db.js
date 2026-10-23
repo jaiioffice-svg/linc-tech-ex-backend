@@ -36,10 +36,28 @@ function writeLocalState(state) {
     fs.writeFileSync(LOCAL_DB_FILE, JSON.stringify(state, null, 2), 'utf8');
 }
 
-function toIsoTimestamp(value) {
+// The existing Supabase schema stores created_at and last_heartbeat as BIGINT
+// epoch milliseconds. Accept legacy ISO strings on reads for compatibility.
+function toEpochMilliseconds(value) {
     if (value === null || value === undefined || value === '') return null;
-    const date = value instanceof Date ? value : new Date(Number.isFinite(Number(value)) ? Number(value) : value);
-    return Number.isNaN(date.getTime()) ? null : date.toISOString();
+    if (typeof value === 'number' && Number.isFinite(value)) return Math.trunc(value);
+    if (typeof value === 'string' && /^\d+$/.test(value)) {
+        const number = Number(value);
+        return Number.isSafeInteger(number) ? number : null;
+    }
+    const date = value instanceof Date ? value : new Date(value);
+    return Number.isNaN(date.getTime()) ? null : date.getTime();
+}
+
+function normalizeSupabaseUser(row) {
+    return {
+        userId: row.user_id,
+        grade: row.grade || 'M1',
+        guardianLineId: row.guardian_line_id || null,
+        createdAt: toEpochMilliseconds(row.created_at) ?? Date.now(),
+        lastHeartbeat: toEpochMilliseconds(row.last_heartbeat) ?? 0,
+        status: row.status || 'active'
+    };
 }
 
 function supabaseBaseUrl() {
@@ -89,17 +107,6 @@ async function supabaseRequest(resource, options = {}) {
     return body ? JSON.parse(body) : null;
 }
 
-function normalizeSupabaseUser(row) {
-    return {
-        userId: row.user_id,
-        grade: row.grade || 'M1',
-        guardianLineId: row.guardian_line_id || null,
-        createdAt: row.created_at ? new Date(row.created_at).getTime() : Date.now(),
-        lastHeartbeat: row.last_heartbeat ? new Date(row.last_heartbeat).getTime() : 0,
-        status: row.status || 'active'
-    };
-}
-
 async function getUser(userId) {
     assertDatabaseAvailable();
     if (!hasSupabaseConfig()) {
@@ -126,14 +133,15 @@ async function saveUser(user) {
         return user;
     }
 
+    const now = Date.now();
     const row = {
         user_id: user.userId,
         grade: user.grade || 'M1',
         guardian_line_id: user.guardianLineId || null,
-        created_at: toIsoTimestamp(user.createdAt) || new Date().toISOString(),
-        last_heartbeat: toIsoTimestamp(user.lastHeartbeat) || new Date().toISOString(),
+        created_at: toEpochMilliseconds(user.createdAt) ?? now,
+        last_heartbeat: toEpochMilliseconds(user.lastHeartbeat) ?? now,
         status: user.status || 'active',
-        updated_at: new Date().toISOString()
+        updated_at: new Date(now).toISOString()
     };
     await supabaseRequest(`${SUPABASE_TABLE}?on_conflict=user_id`, {
         method: 'POST',
@@ -152,9 +160,10 @@ async function getStaleActiveUsers(cutoffTimestamp) {
         );
     }
 
-    const cutoff = new Date(cutoffTimestamp).toISOString();
+    const cutoff = toEpochMilliseconds(cutoffTimestamp);
+    if (cutoff === null) throw new TypeError('A valid cutoff timestamp is required');
     const rows = await supabaseRequest(
-        `${SUPABASE_TABLE}?status=eq.active&last_heartbeat=lt.${encodeURIComponent(cutoff)}&select=user_id,grade,guardian_line_id,created_at,last_heartbeat,status`
+        `${SUPABASE_TABLE}?status=eq.active&last_heartbeat=lt.${encodeURIComponent(String(cutoff))}&select=user_id,grade,guardian_line_id,created_at,last_heartbeat,status`
     );
     return rows.map(normalizeSupabaseUser);
 }
