@@ -139,6 +139,12 @@ async function saveUser(user) {
     return user;
 }
 
+async function checkDatabaseConnection() {
+    if (!hasSupabaseConfig()) return false;
+    const rows = await supabaseRequest(`${SUPABASE_TABLE}?select=user_id&limit=1`);
+    return Array.isArray(rows);
+}
+
 function calculateWeightedRevenue(grade, studentCount) {
     let weight = 1;
     const cleanGrade = String(grade).trim();
@@ -158,5 +164,6 @@ module.exports = {
     isDatabaseConfigured,
     getUser,
     saveUser,
+    checkDatabaseConnection,
     calculateWeightedRevenue
 };
