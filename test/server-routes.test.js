@@ -151,3 +151,36 @@ test('oversized JSON receives a safe JSON 413 response', async () => {
         message: 'Request body too large'
     });
 });
+
+test('immediate-delete endpoint rejects missing or incorrect service API keys before processing', async () => {
+    const previousKey = process.env.LINC_API_KEY;
+    process.env.LINC_API_KEY = 'expected-delete-test-secret';
+
+    try {
+        const cases = [
+            { name: 'missing key', headers: {} },
+            { name: 'incorrect key', headers: { 'x-linc-api-key': 'wrong-delete-test-secret' } }
+        ];
+
+        for (const testCase of cases) {
+            const response = await fetch(`${baseUrl}/api/v1/alert/delete`, {
+                method: 'POST',
+                headers: {
+                    'content-type': 'application/json',
+                    ...testCase.headers
+                },
+                body: JSON.stringify({ userId: 'synthetic-user-must-not-be-mutated' })
+            });
+            const body = await response.json();
+
+            assert.equal(response.status, 401, testCase.name);
+            assert.deepEqual(body, {
+                success: false,
+                message: 'Unauthorized connection'
+            }, testCase.name);
+        }
+    } finally {
+        if (previousKey === undefined) delete process.env.LINC_API_KEY;
+        else process.env.LINC_API_KEY = previousKey;
+    }
+});
