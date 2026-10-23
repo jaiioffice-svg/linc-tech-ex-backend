@@ -88,6 +88,19 @@ app.get('/api/cron/check-heartbeats', async (req, res) => {
     }
 });
 
+
+// Return safe JSON errors for body-parser failures instead of Express's default
+// HTML error response. Never expose parser internals or request payload fragments.
+app.use((error, req, res, next) => {
+    if (error && error.type === 'entity.parse.failed') {
+        return res.status(400).json({ success: false, message: 'Invalid JSON request body' });
+    }
+    if (error && error.type === 'entity.too.large') {
+        return res.status(413).json({ success: false, message: 'Request body too large' });
+    }
+    return next(error);
+});
+
 if (require.main === module) {
     if (!(process.env.VERCEL || process.env.VERCEL_ENV)) startHeartbeatMonitor(recordAlertEvent);
     const port = process.env.PORT || 3000;
