@@ -67,9 +67,22 @@ async function supabaseRequest(resource, options = {}) {
     }
 
     if (!response.ok) {
+        // Keep upstream diagnostics safe: only retain a short PostgREST error code,
+        // never log or return the upstream response body or database details.
+        let upstreamCode = null;
+        try {
+            const payload = await response.clone().json();
+            if (payload && typeof payload.code === 'string' &&
+                /^[A-Z0-9_]{3,24}$/.test(payload.code)) {
+                upstreamCode = payload.code;
+            }
+        } catch (_) {
+            // Non-JSON responses (for example, an incorrect project URL) are expected here.
+        }
         const error = new Error('Database request failed');
         error.code = 'DB_UNAVAILABLE';
         error.status = response.status;
+        error.upstreamCode = upstreamCode;
         throw error;
     }
 
