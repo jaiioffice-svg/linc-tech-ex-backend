@@ -1,8 +1,8 @@
 -- Align legacy timestamp columns with db.js epoch-millisecond storage.
 -- Review and apply to the intended Supabase project; GitHub commits do not run SQL.
--- created_at's old DEFAULT now() must be dropped before changing its type, then
--- restored as an epoch-millisecond expression. This avoids PostgreSQL attempting
--- to cast the old timestamptz default to bigint independently of the USING clause.
+-- Drop legacy defaults before changing column types: PostgreSQL casts defaults
+-- independently of the USING expression. created_at receives a compatible
+-- epoch-millisecond default; last_heartbeat intentionally remains without a default.
 
 do $migration$
 declare
@@ -18,8 +18,6 @@ begin
         raise exception 'public.linc_users.created_at does not exist; apply the base schema migration first';
     end if;
 
-    -- Remove the legacy now() default before any type conversion. Recreate a
-    -- compatible default after the column is known to be BIGINT.
     alter table public.linc_users alter column created_at drop default;
 
     if column_type = 'bigint' then
@@ -47,7 +45,13 @@ begin
 
     if column_type is null then
         raise exception 'public.linc_users.last_heartbeat does not exist; apply the base schema migration first';
-    elsif column_type = 'bigint' then
+    end if;
+
+    -- The intended schema has no last_heartbeat default. Drop any legacy
+    -- timestamp default so it cannot break conversion to BIGINT.
+    alter table public.linc_users alter column last_heartbeat drop default;
+
+    if column_type = 'bigint' then
         null; -- Already in the required format.
     elsif column_type = 'timestamp with time zone' then
         alter table public.linc_users
