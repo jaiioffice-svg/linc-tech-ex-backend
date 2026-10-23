@@ -14,11 +14,16 @@ async function runHeartbeatCheck(triggerAlertCallback, now = Date.now()) {
         markedMissing += 1;
 
         if (typeof triggerAlertCallback === 'function') {
-            await triggerAlertCallback({
-                userId: latest.userId,
-                guardianLineId: latest.guardianLineId || null,
-                reason: 'SYSTEM_DISCONNECTED_ALERT'
-            });
+            try {
+                await triggerAlertCallback({
+                    userId: latest.userId,
+                    guardianLineId: latest.guardianLineId || null,
+                    reason: 'SYSTEM_DISCONNECTED_ALERT'
+                });
+            } catch (_) {
+                // Alert delivery must not prevent later stale users from being processed.
+                console.error('[HEARTBEAT_ALERT] callback failed: delivery_error');
+            }
         }
     }
 
