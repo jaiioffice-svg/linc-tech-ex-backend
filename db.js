@@ -60,8 +60,13 @@ async function supabaseRequest(resource, options = {}) {
         response = await fetch(`${supabaseBaseUrl()}/rest/v1/${resource}`, {
             ...options,
             headers: {
+                // New Supabase sb_secret_* keys are opaque API keys, not JWTs.
+                // Send them only through the apikey header; putting one in
+                // Authorization: Bearer makes Supabase attempt JWT validation.
                 apikey: serviceKey,
-                Authorization: `Bearer ${serviceKey}`,
+                ...(!serviceKey.startsWith('sb_secret_')
+                    ? { Authorization: `Bearer ${serviceKey}` }
+                    : {}),
                 'Content-Type': 'application/json',
                 ...(options.headers || {})
             }
