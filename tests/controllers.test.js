@@ -106,3 +106,36 @@ test('delete alert marks an existing profile and records the event', async () =>
     assert.equal(alert.guardianLineId, 'verified-guardian');
     assert.equal(alert.reason, 'APP_TERMINATION_SIGNAL');
 });
+
+
+test('delete alert remains recorded when the alert callback fails', async () => {
+    let saved;
+    const previousError = console.error;
+    const logged = [];
+    console.error = (...args) => logged.push(args);
+    try {
+        const controllers = loadControllers({
+            getUser: async () => ({
+                userId: 'test-user',
+                grade: 'M1',
+                guardianLineId: 'verified-guardian',
+                createdAt: Date.now(),
+                lastHeartbeat: Date.now(),
+                status: 'active'
+            }),
+            saveUser: async user => { saved = { ...user }; }
+        });
+        const res = responseRecorder();
+        await controllers.handleImmediateDelete(
+            { body: { userId: 'test-user' } },
+            res,
+            async () => { const error = new Error('synthetic delivery failure'); error.code = 'TEST_DELIVERY_FAILURE'; throw error; }
+        );
+        assert.equal(res.statusCode, 200);
+        assert.deepEqual(res.body, { success: true, message: 'Termination event recorded' });
+        assert.equal(saved.status, 'app_deleted');
+        assert.deepEqual(logged, [['[IMMEDIATE_DELETE] alert callback failed', 'TEST_DELIVERY_FAILURE']]);
+    } finally {
+        console.error = previousError;
+    }
+});
