@@ -37,7 +37,13 @@ function writeLocalState(state) {
 }
 
 function supabaseBaseUrl() {
-    return process.env.SUPABASE_URL.replace(/\/$/, '');
+    // Accept either the Supabase Project URL or a URL copied with /rest/v1.
+    // The REST path is appended by supabaseRequest, so retaining it here would
+    // create /rest/v1/rest/v1/... and PostgREST responds with PGRST125.
+    return process.env.SUPABASE_URL
+        .trim()
+        .replace(/\/+$/, '')
+        .replace(/\/rest\/v1$/i, '');
 }
 
 async function supabaseRequest(resource, options = {}) {
