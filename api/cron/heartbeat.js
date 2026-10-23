@@ -1,6 +1,7 @@
 const crypto = require('crypto');
-const { runHeartbeatCheck } = require('../../checker');
 
+// Heartbeat monitoring is intentionally deferred for this release.
+// This placeholder is not mounted by the current vercel.json routing.
 module.exports = async function handler(req, res) {
     if (req.method !== 'GET') {
         return res.status(405).json({ success: false, message: 'Method not allowed' });
@@ -18,16 +19,8 @@ module.exports = async function handler(req, res) {
         return res.status(401).json({ success: false, message: 'Unauthorized connection' });
     }
 
-    try {
-        const result = await runHeartbeatCheck(alert => {
-            console.warn('[ALERT_PENDING]', JSON.stringify({
-                userId: alert.userId,
-                reason: alert.reason,
-                guardianLinked: Boolean(alert.guardianLineId)
-            }));
-        });
-        return res.status(200).json({ success: true, ...result });
-    } catch (_) {
-        return res.status(503).json({ success: false, message: 'Storage service unavailable' });
-    }
+    return res.status(501).json({
+        success: false,
+        message: 'Heartbeat monitoring is deferred for this release'
+    });
 };
