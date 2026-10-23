@@ -70,3 +70,31 @@ test('protected API rejects requests without an API key', async () => {
     assert.equal(body.message, 'Unauthorized connection');
     delete process.env.LINC_API_KEY;
 });
+
+test('heartbeat rejects an empty user identifier before database access', async () => {
+    process.env.LINC_API_KEY = 'test-only-key';
+    const response = await fetch(`${baseUrl}/api/v1/heartbeat`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', 'x-linc-api-key': 'test-only-key' },
+        body: JSON.stringify({ userId: '   ' })
+    });
+    const body = await response.json();
+    assert.equal(response.status, 400);
+    assert.equal(body.success, false);
+    assert.equal(body.message, 'Missing core identifier');
+    delete process.env.LINC_API_KEY;
+});
+
+test('heartbeat rejects an oversized user identifier before database access', async () => {
+    process.env.LINC_API_KEY = 'test-only-key';
+    const response = await fetch(`${baseUrl}/api/v1/heartbeat`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', 'x-linc-api-key': 'test-only-key' },
+        body: JSON.stringify({ userId: 'u'.repeat(201) })
+    });
+    const body = await response.json();
+    assert.equal(response.status, 400);
+    assert.equal(body.success, false);
+    assert.equal(body.message, 'Invalid user identifier');
+    delete process.env.LINC_API_KEY;
+});
