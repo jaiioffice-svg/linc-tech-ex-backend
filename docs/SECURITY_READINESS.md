@@ -3,6 +3,15 @@
 Last reviewed: 2026-10-24
 Scope: current backend branch `fix/supabase-readiness-diagnostics`.
 
+## Latest verification (2026-10-24)
+
+- Latest branch commit checked: `5bd9d9ab3a03405b124f37684b664be59b784250` (`fix: drop legacy heartbeat timestamp default before conversion`).
+- GitHub Actions run #58 passed on this commit, including dependency installation and the test suite: https://github.com/jaiioffice-svg/linc-tech-ex-backend/actions/runs/40024338755.
+- Vercel Preview deployment `dpl_AerG2MdqFbqzipanUpx1EdwVJnTD` reached `READY`: https://linc-tech-ex-backend-hsx0q6s04-linc8.vercel.app/ . Production was not changed.
+- Latest Preview `GET /health` returned HTTP 200 with `status: operational`; `GET /ready` returned HTTP 200 with `status: ready` and `database: reachable`.
+- These checks validate dependency install, automated tests, deployment readiness, and database reachability only. They do **not** verify live application-data writes/reads, per-user authentication, ownership enforcement, or guardian notification delivery.
+- The timestamp conversion migration has **not** been applied to the live Supabase database. Verify live column types and existing timestamp semantics first. PR #6 remains open and Draft; do not merge or promote to Production until release blockers are resolved.
+
 ## Current verified state
 
 - GitHub Actions run #55 passed on commit `851a91cc72805cab3e8018b739c7db7c76f115bb`: https://github.com/jaiioffice-svg/linc-tech-ex-backend/actions/runs/40023218385.
