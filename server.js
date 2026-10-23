@@ -5,6 +5,7 @@ const helmet = require('helmet');
 const { handleHeartbeat, handleImmediateDelete } = require('./controllers');
 const { runHeartbeatCheck, startHeartbeatMonitor } = require('./checker');
 const { validateApiKey } = require('./auth');
+const { sendGuardianAlert } = require('./line-alert');
 const { isDatabaseConfigured, hasSupabaseConfig } = require('./db');
 
 const app = express();
@@ -12,13 +13,19 @@ app.use(express.json({ limit: '32kb' }));
 app.use(cors());
 app.use(helmet());
 
-function recordAlertEvent(alertPayload) {
-    // Delivery is not implemented yet. Do not log guardian IDs or credentials.
-    console.warn('[ALERT_PENDING]', JSON.stringify({
-        userId: alertPayload.userId,
-        reason: alertPayload.reason,
-        guardianLinked: Boolean(alertPayload.guardianLineId)
-    }));
+async function recordAlertEvent(alertPayload) {
+    try {
+        const result = await sendGuardianAlert(alertPayload);
+        if (!result.sent) {
+            console.warn('[ALERT_PENDING]', JSON.stringify({
+                reason: alertPayload.reason,
+                guardianLinked: Boolean(alertPayload.guardianLineId),
+                deliveryReason: result.reason
+            }));
+        }
+    } catch (error) {
+        console.error('[LINE_ALERT] delivery failed', error && error.name ? error.name : 'ERROR');
+    }
 }
 
 app.post('/api/v1/heartbeat', validateApiKey, handleHeartbeat);
