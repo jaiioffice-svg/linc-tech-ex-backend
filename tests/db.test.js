@@ -76,7 +76,9 @@ test('saveUser sends the upsert fields and required conflict target', async t =>
     const row = JSON.parse(request.options.body);
     assert.equal(row.user_id, 'user-upsert-test');
     assert.equal(row.status, 'active');
-    assert.ok(row.updated_at);
+    assert.equal(row.created_at, Date.UTC(2026, 0, 1));
+    assert.equal(row.last_heartbeat, Date.UTC(2026, 0, 2));
+    assert.equal(typeof row.updated_at, 'string');
 });
 
 test('getStaleActiveUsers queries active rows older than the cutoff', async t => {
