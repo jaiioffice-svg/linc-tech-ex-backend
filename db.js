@@ -147,7 +147,7 @@ async function supabaseRequest(resource, options = {}) {
             ? upstream.code.slice(0, 40)
             : null;
         const upstreamMessage = upstream && typeof upstream.message === 'string'
-            ? upstream.message.replace(/[\\r\\n\\t]+/g, ' ').slice(0, 180)
+            ? upstream.message.replace(/[\r\n\t]+/g, ' ').slice(0, 180)
             : null;
 
         const error = new Error('Database request failed');
