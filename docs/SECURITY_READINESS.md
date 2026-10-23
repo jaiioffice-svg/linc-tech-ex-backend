@@ -5,10 +5,11 @@ Scope: current backend branch `fix/supabase-readiness-diagnostics`.
 
 ## Current verified state
 
-- GitHub Actions run #50 passed on commit `49e46eea5f1a4f724163d33cdb382d64c6bf2339`.
-- Vercel Preview deployment for that commit reached `READY`: `linc-tech-ex-backend-77620egrs-linc8.vercel.app`. This is a Preview deployment; Production was not changed.
-- Live Preview `GET /health` returned HTTP 200 with `status: operational`.
-- Live Preview `GET /ready` returned HTTP 200 with `status: ready` and `database: reachable`. This proves the readiness probe can reach Supabase, not that application data can be written/read end-to-end.
+- GitHub Actions run #55 passed on commit `851a91cc72805cab3e8018b739c7db7c76f115bb`: https://github.com/jaiioffice-svg/linc-tech-ex-backend/actions/runs/40023218385.
+- Vercel Preview deployment for that commit reached `READY`: `linc-tech-ex-backend-ppa73hrtd-linc8.vercel.app`. This is a Preview deployment; Production was not changed.
+- Latest live Preview `GET /health` returned HTTP 200 with `status: operational`.
+- Latest live Preview `GET /ready` returned HTTP 200 with `status: ready` and `database: reachable`. This proves the readiness probe can reach Supabase, not that application data can be written/read end-to-end.
+- Added `docs/API_AUTH_CONTRACT.md` in commit `851a91c` to specify a proposed, explicitly unimplemented auth/client contract. It does not add or claim new runtime routes.
 - Vercel project settings show these environment-variable names targeted to Preview: `CRON_SECRET`, `LINC_API_KEY`, `SUPABASE_URL`, and `SUPABASE_SERVICE_ROLE_KEY`. Values were not retrieved or printed. Their presence in settings does not prove each value is valid.
 - Live Preview `GET /api/user/linc-contract-audit-nonexistent` returned HTTP 404 `Cannot GET /api/user/...`, confirming the saved client snapshot's profile-restore endpoint is not implemented in this backend.
 - The current test suite includes controller tests, database adapter tests, LINE alert tests, API-key middleware tests, and HTTP-level rejection tests.
