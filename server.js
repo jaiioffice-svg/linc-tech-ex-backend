@@ -3,7 +3,7 @@ const cors = require('cors');
 const helmet = require('helmet');
 const { handleUserRegistration, handleHeartbeat, handleImmediateDelete } = require('./controllers');
 const { validateApiKey } = require('./auth');
-const { isDatabaseConfigured } = require('./db');
+const { isDatabaseConfigured, checkDatabaseConnection } = require('./db');
 
 const app = express();
 app.use(express.json({ limit: '64kb' }));
@@ -27,11 +27,20 @@ app.post('/api/v1/alert/delete', validateApiKey, (req, res) => handleImmediateDe
 app.get('/health', (req, res) => res.status(200).json({ status: 'operational', timestamp: Date.now() }));
 app.get('/api/health', (req, res) => res.status(200).json({ status: 'operational', timestamp: Date.now() }));
 
-function readinessHandler(req, res) {
+async function readinessHandler(req, res) {
     if (!isDatabaseConfigured()) {
         return res.status(503).json({ status: 'not_ready', reason: 'database_not_configured' });
     }
-    return res.status(200).json({ status: 'ready' });
+    try {
+        const connected = await checkDatabaseConnection();
+        if (!connected) {
+            return res.status(503).json({ status: 'not_ready', reason: 'database_unavailable' });
+        }
+        return res.status(200).json({ status: 'ready' });
+    } catch (error) {
+        console.error('[READINESS] database check failed', error && error.code ? error.code : 'DB_UNAVAILABLE');
+        return res.status(503).json({ status: 'not_ready', reason: 'database_unavailable' });
+    }
 }
 app.get('/ready', readinessHandler);
 app.get('/api/ready', readinessHandler);
