@@ -61,11 +61,20 @@ exports.handleImmediateDelete = async (req, res, triggerAlertCallback) => {
         await saveUser(targetUser);
 
         if (typeof triggerAlertCallback === 'function') {
-            await triggerAlertCallback({
-                userId,
-                guardianLineId: targetUser.guardianLineId || null,
-                reason: 'APP_TERMINATION_SIGNAL'
-            });
+            try {
+                await triggerAlertCallback({
+                    userId,
+                    guardianLineId: targetUser.guardianLineId || null,
+                    reason: 'APP_TERMINATION_SIGNAL'
+                });
+            } catch (error) {
+                // The state change is already durable. Do not return a retry-inducing
+                // 500 for a notification-only failure; avoid logging payloads/secrets.
+                console.error(
+                    '[IMMEDIATE_DELETE] alert callback failed',
+                    error && error.code ? error.code : 'DELIVERY_ERROR'
+                );
+            }
         }
 
         return res.status(200).json({ success: true, message: 'Termination event recorded' });
