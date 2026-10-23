@@ -1,7 +1,7 @@
 const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
-const { handleUserRegistration, handleImmediateDelete } = require('./controllers');
+const { handleUserRegistration, handleHeartbeat, handleImmediateDelete } = require('./controllers');
 const { validateApiKey } = require('./auth');
 const { isDatabaseConfigured } = require('./db');
 
@@ -19,7 +19,8 @@ function sendEmergencySignal(alertPayload) {
     }));
 }
 
-// Register a user profile without periodic heartbeat monitoring.
+// Preserve the existing heartbeat contract and support explicit profile registration.
+app.post('/api/v1/heartbeat', validateApiKey, handleHeartbeat);
 app.post('/api/v1/users/register', validateApiKey, handleUserRegistration);
 app.post('/api/v1/alert/delete', validateApiKey, (req, res) => handleImmediateDelete(req, res, sendEmergencySignal));
 
