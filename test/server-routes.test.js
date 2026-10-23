@@ -114,3 +114,40 @@ test('cron endpoint rejects an incorrect bearer secret', async () => {
         else process.env.CRON_SECRET = previousSecret;
     }
 });
+
+test('malformed JSON receives a safe JSON 400 response', async () => {
+    const response = await fetch(`${baseUrl}/api/v1/heartbeat`, {
+        method: 'POST',
+        headers: {
+            'content-type': 'application/json',
+            'x-linc-api-key': 'not-used-before-body-parse'
+        },
+        body: '{"userId":'
+    });
+    const body = await response.json();
+
+    assert.equal(response.status, 400);
+    assert.deepEqual(body, {
+        success: false,
+        message: 'Invalid JSON request body'
+    });
+});
+
+test('oversized JSON receives a safe JSON 413 response', async () => {
+    const oversizedBody = JSON.stringify({ data: 'x'.repeat(33 * 1024) });
+    const response = await fetch(`${baseUrl}/api/v1/heartbeat`, {
+        method: 'POST',
+        headers: {
+            'content-type': 'application/json',
+            'x-linc-api-key': 'not-used-before-body-parse'
+        },
+        body: oversizedBody
+    });
+    const body = await response.json();
+
+    assert.equal(response.status, 413);
+    assert.deepEqual(body, {
+        success: false,
+        message: 'Request body too large'
+    });
+});
