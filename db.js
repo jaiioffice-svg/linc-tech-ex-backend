@@ -158,6 +158,15 @@ async function saveUser(user) {
     return user;
 }
 
+function classifyDatabaseFailure(error) {
+    const code = error && error.upstreamCode;
+    if (code === 'PGRST125') return 'invalid_rest_url';
+    if (code === 'PGRST205' || code === '42P01') return 'table_missing';
+    if (code === '42501') return 'database_permission_denied';
+    if (error && (error.status === 401 || error.status === 403)) return 'database_auth_failed';
+    return 'database_unavailable';
+}
+
 async function checkDatabaseConnection() {
     if (!hasSupabaseConfig()) return false;
     const rows = await supabaseRequest(`${SUPABASE_TABLE}?select=user_id&limit=1`);
@@ -184,5 +193,6 @@ module.exports = {
     getUser,
     saveUser,
     checkDatabaseConnection,
+    classifyDatabaseFailure,
     calculateWeightedRevenue
 };
