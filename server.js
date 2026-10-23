@@ -38,7 +38,7 @@ async function readinessHandler(req, res) {
         }
         return res.status(200).json({ status: 'ready' });
     } catch (error) {
-        console.error('[READINESS] database check failed', error && error.code ? error.code : 'DB_UNAVAILABLE');
+        console.error('[READINESS] database check failed', error && error.code ? error.code : 'DB_UNAVAILABLE', error && error.status ? error.status : 'NO_STATUS');
         return res.status(503).json({ status: 'not_ready', reason: 'database_unavailable' });
     }
 }
