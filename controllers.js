@@ -47,6 +47,46 @@ exports.handleUserRegistration = async (req, res) => {
     }
 };
 
+// Keep the existing mobile-app heartbeat endpoint while using Supabase persistence.
+exports.handleHeartbeat = async (req, res) => {
+    try {
+        const { userId, grade, guardianLineId } = req.body || {};
+        if (typeof userId !== 'string' || !userId.trim()) {
+            return res.status(400).json({ success: false, message: 'Missing core identifier' });
+        }
+        if (userId.length > 200) {
+            return res.status(400).json({ success: false, message: 'Invalid user identifier' });
+        }
+
+        const now = Date.now();
+        const existingUser = await getUser(userId);
+        const user = existingUser || {
+            userId,
+            grade: typeof grade === 'string' && grade.trim() ? grade.trim() : 'M1',
+            guardianLineId: typeof guardianLineId === 'string' && guardianLineId.trim()
+                ? guardianLineId.trim()
+                : null,
+            createdAt: now,
+            status: 'active'
+        };
+
+        if (existingUser && typeof grade === 'string' && grade.trim()) user.grade = grade.trim();
+        if (typeof guardianLineId === 'string' && guardianLineId.trim()) {
+            user.guardianLineId = guardianLineId.trim();
+        }
+        user.lastHeartbeat = now;
+        user.status = 'active';
+        await saveUser(user);
+
+        return res.status(existingUser ? 200 : 201).json({
+            success: true,
+            message: 'Heartbeat acknowledged'
+        });
+    } catch (error) {
+        return sendError(res, error, 'HEARTBEAT');
+    }
+};
+
 exports.handleImmediateDelete = async (req, res, triggerAlertCallback) => {
     try {
         const { userId } = req.body || {};
