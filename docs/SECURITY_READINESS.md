@@ -1,13 +1,13 @@
 # L!nc Backend Security Readiness
 
-Last reviewed: 2026-10-24
+Last reviewed: 2026-10-24 (follow-up verification)
 Scope: current backend branch `fix/supabase-readiness-diagnostics`.
 
 ## Latest verification (2026-10-24)
 
-- Latest branch commit checked: `dcd2eb266dd763b0535f7f084dbf1b79b4749566` (`docs: record live Supabase schema inspection`).
-- GitHub Actions run #65 passed for this commit, including the backend workflow: https://api.github.com/repos/jaiioffice-svg/linc-tech-ex-backend/actions/runs/40025998457.
-- Vercel Preview deployment `dpl_DdoscT7othiEv98u2owZBnjyrxhN` reached `READY`: https://linc-tech-ex-backend-fl4lh8ucu-linc8.vercel.app/ . Production was not changed.
+- Latest branch commit checked: `13c43c0cacf2cea078dcf5f91720b41659d83051` (`docs: record latest preview and timestamp checks`).
+- GitHub Actions run #67 passed for this commit: https://api.github.com/repos/jaiioffice-svg/linc-tech-ex-backend/actions/runs/40026993869.
+- Vercel Preview deployment `dpl_F72RcYe3vgpywwR84EjKUPVHzkxw` reached `READY`: https://linc-tech-ex-backend-5hhli0yqa-linc8.vercel.app/ . Production was not changed.
 - Live Preview `GET /health` returned HTTP 200 with `status: operational`; `GET /ready` returned HTTP 200 with `status: ready` and `database: reachable`.
 - These checks validate CI, deployment readiness, and database reachability only. They do **not** verify live application-data writes/reads, per-user authentication, ownership enforcement, or guardian notification delivery.
 - The timestamp conversion migration has **not** been applied to the live Supabase database. PR #6 remains open and Draft; do not merge or promote to Production until release blockers are resolved.
@@ -80,3 +80,17 @@ A read-only aggregate query returned one row:
 - Never allow heartbeat requests to create or modify guardian links.
 - Guardian notifications must be opt-in, tied to a verified link, and phrased with care.
 - Keep diagnostic endpoints non-mutating and do not create unauthenticated write/test backdoors.
+
+
+## Follow-up timestamp comparison (read-only, 2026-10-24)
+
+The project owner reported the following UTC values from a read-only query:
+
+- `created_at_utc`: `2026-10-23 14:07:26.600+00`
+- `heartbeat_utc`: `2026-10-23 14:17:34.220+00`
+- `updated_at`: `2026-10-23 14:27:17.813+00`
+- `heartbeat_vs_updated_at`: `-00:09:43.593` (updated_at is later than last_heartbeat by 9 minutes 43.593 seconds)
+
+This difference is **not by itself proof of a schema defect**: `updated_at` records a row update, while `last_heartbeat` records a heartbeat. However, the gap is larger than the milliseconds-scale difference expected when the current `saveUser()` path writes both from the same operation. The available snapshot cannot identify which later operation changed `updated_at`, nor prove that the two values came from one request.
+
+Next diagnostic step: inspect relevant database triggers and available application/deployment logs in read-only mode, then run a controlled Preview write/read test with a dedicated test identity. Do not alter timestamp columns, apply the conversion migration, or infer a production incident from this comparison alone. Live write/read and event-time semantics remain unverified.
