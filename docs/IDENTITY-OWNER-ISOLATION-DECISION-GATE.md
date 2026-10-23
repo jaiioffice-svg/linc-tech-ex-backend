@@ -43,3 +43,12 @@ Do not implement both approaches in parallel without an approved migration plan.
 ## Explicit non-goals
 
 This document does not choose an identity provider, alter runtime behavior, modify database rows or grants, or authorize Production deployment. Those require evidence from the exact client build and a reviewed implementation plan.
+
+
+## Client snapshot evidence (must be reconciled before coding)
+
+A reviewed L!nc `App.tsx` snapshot dated 2026-10-18 in the project files uses `localStorage.getItem('linc_current_user_id')` and restores a profile with `GET /api/user/${savedUserId}`. In that file, the restore request does not attach a Bearer token, and profile completion writes `savedUser.id` to local storage. This is a client-held identifier, not proof of account ownership.
+
+This finding applies to that reviewed snapshot only. It does **not** prove that the same client version is currently deployed or is the archive the user wants to ship. Before modifying routes, compare the intended release source with this snapshot and with the separate client archive that contains an opaque-session implementation. These snapshots disagree on the auth contract; do not combine their assumptions.
+
+If the localStorage-only snapshot is the intended release, treat user profile restore and all user-owned routes as unauthenticated until a real server-verifiable identity/session is wired end-to-end. Do not make the existing `GET /api/user/:id` route public merely to preserve the current UI.
