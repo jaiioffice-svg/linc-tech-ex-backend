@@ -1,29 +1,56 @@
 const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
-const { handleHeartbeat, handleImmediateDelete } = require('./controllers');
-const { startHeartbeatMonitor } = require('./checker');
+const { handleUserRegistration, handleHeartbeat, handleImmediateDelete } = require('./controllers');
 const { validateApiKey } = require('./auth');
+const { isDatabaseConfigured, checkDatabaseConnection, classifyDatabaseFailure } = require('./db');
 
 const app = express();
-app.use(express.json());
+app.use(express.json({ limit: '64kb' }));
 app.use(cors());
 app.use(helmet());
 
 function sendEmergencySignal(alertPayload) {
-    console.log(`[ALERT] Gateway signal sent to Guardian ${alertPayload.guardianLineId}. User: ${alertPayload.userId}`);
+    // Notification delivery is not integrated yet. Keep guardian IDs out of logs.
+    console.warn('[ALERT_PENDING]', JSON.stringify({
+        userId: alertPayload.userId,
+        reason: alertPayload.reason,
+        guardianLinked: Boolean(alertPayload.guardianLineId)
+    }));
 }
 
-startHeartbeatMonitor(sendEmergencySignal);
-
+// Preserve the existing heartbeat contract and support explicit profile registration.
 app.post('/api/v1/heartbeat', validateApiKey, handleHeartbeat);
+app.post('/api/v1/users/register', validateApiKey, handleUserRegistration);
 app.post('/api/v1/alert/delete', validateApiKey, (req, res) => handleImmediateDelete(req, res, sendEmergencySignal));
 
 app.get('/health', (req, res) => res.status(200).json({ status: 'operational', timestamp: Date.now() }));
+app.get('/api/health', (req, res) => res.status(200).json({ status: 'operational', timestamp: Date.now() }));
+
+async function readinessHandler(req, res) {
+    if (!isDatabaseConfigured()) {
+        return res.status(503).json({ status: 'not_ready', reason: 'database_not_configured' });
+    }
+    try {
+        const connected = await checkDatabaseConnection();
+        if (!connected) {
+            return res.status(503).json({ status: 'not_ready', reason: 'database_unavailable' });
+        }
+        return res.status(200).json({ status: 'ready' });
+    } catch (error) {
+        const reason = classifyDatabaseFailure(error);
+        console.error('[READINESS] database check failed', error && error.code ? error.code : 'DB_UNAVAILABLE', error && error.status ? error.status : 'NO_STATUS', error && error.upstreamCode ? error.upstreamCode : 'NO_UPSTREAM_CODE', reason);
+        return res.status(503).json({ status: 'not_ready', reason });
+    }
+}
+app.get('/ready', readinessHandler);
+app.get('/api/ready', readinessHandler);
 
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => {
-    console.log(`Linc Core Backend active and secure on port ${PORT}`);
-});
+if (require.main === module) {
+    app.listen(PORT, () => {
+        console.log(`Linc Core Backend active and secure on port ${PORT}`);
+    });
+}
 
 module.exports = app;
