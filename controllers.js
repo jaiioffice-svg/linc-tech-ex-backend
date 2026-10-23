@@ -61,7 +61,7 @@ exports.handleImmediateDelete = async (req, res, triggerAlertCallback) => {
         await saveUser(targetUser);
 
         if (typeof triggerAlertCallback === 'function') {
-            triggerAlertCallback({
+            await triggerAlertCallback({
                 userId,
                 guardianLineId: targetUser.guardianLineId || null,
                 reason: 'APP_TERMINATION_SIGNAL'
