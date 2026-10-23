@@ -25,17 +25,24 @@ async function sendGuardianAlert(alertPayload) {
         return { sent: false, reason: 'guardian_not_linked' };
     }
 
-    const response = await fetch(LINE_PUSH_URL, {
-        method: 'POST',
-        headers: {
-            Authorization: `Bearer ${token}`,
-            'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-            to: alertPayload.guardianLineId,
-            messages: [{ type: 'text', text: alertText(alertPayload.reason) }]
-        })
-    });
+    let response;
+    try {
+        response = await fetch(LINE_PUSH_URL, {
+            method: 'POST',
+            headers: {
+                Authorization: `Bearer ${token}`,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                to: alertPayload.guardianLineId,
+                messages: [{ type: 'text', text: alertText(alertPayload.reason) }]
+            })
+        });
+    } catch (_) {
+        // Network errors may contain request details; return a safe reason without logging them.
+        console.error('[LINE_ALERT] delivery failed: network_error');
+        return { sent: false, reason: 'provider_error' };
+    }
 
     if (!response.ok) {
         // Do not log tokens, guardian IDs, or response bodies which may contain identifiers.
