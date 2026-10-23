@@ -3,7 +3,7 @@ const cors = require('cors');
 const helmet = require('helmet');
 const { handleUserRegistration, handleHeartbeat, handleImmediateDelete } = require('./controllers');
 const { validateApiKey } = require('./auth');
-const { isDatabaseConfigured, checkDatabaseConnection } = require('./db');
+const { isDatabaseConfigured, checkDatabaseConnection, classifyDatabaseFailure } = require('./db');
 
 const app = express();
 app.use(express.json({ limit: '64kb' }));
@@ -38,8 +38,9 @@ async function readinessHandler(req, res) {
         }
         return res.status(200).json({ status: 'ready' });
     } catch (error) {
-        console.error('[READINESS] database check failed', error && error.code ? error.code : 'DB_UNAVAILABLE', error && error.status ? error.status : 'NO_STATUS', error && error.upstreamCode ? error.upstreamCode : 'NO_UPSTREAM_CODE');
-        return res.status(503).json({ status: 'not_ready', reason: 'database_unavailable' });
+        const reason = classifyDatabaseFailure(error);
+        console.error('[READINESS] database check failed', error && error.code ? error.code : 'DB_UNAVAILABLE', error && error.status ? error.status : 'NO_STATUS', error && error.upstreamCode ? error.upstreamCode : 'NO_UPSTREAM_CODE', reason);
+        return res.status(503).json({ status: 'not_ready', reason });
     }
 }
 app.get('/ready', readinessHandler);
