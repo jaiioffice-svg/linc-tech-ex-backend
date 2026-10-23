@@ -50,3 +50,31 @@ test('classifies safe database readiness diagnostics', () => {
     assert.equal(classifyDatabaseFailure({ status: 403 }), 'database_auth_failed');
     assert.equal(classifyDatabaseFailure({ status: 500 }), 'database_unavailable');
 });
+
+test('new Supabase secret API keys are sent as apikey, not as a Bearer JWT', async () => {
+    const previousEnv = {
+        SUPABASE_URL: process.env.SUPABASE_URL,
+        SUPABASE_SERVICE_ROLE_KEY: process.env.SUPABASE_SERVICE_ROLE_KEY
+    };
+    const previousFetch = global.fetch;
+    let capturedOptions;
+    process.env.SUPABASE_URL = 'https://example.supabase.co';
+    process.env.SUPABASE_SERVICE_ROLE_KEY = 'sb_secret_test-only';
+    global.fetch = async (_url, options) => {
+        capturedOptions = options;
+        return { ok: true, text: async () => '[]' };
+    };
+
+    try {
+        const { checkDatabaseConnection } = require('../db');
+        assert.equal(await checkDatabaseConnection(), true);
+        assert.equal(capturedOptions.headers.apikey, 'sb_secret_test-only');
+        assert.equal(Object.hasOwn(capturedOptions.headers, 'Authorization'), false);
+    } finally {
+        global.fetch = previousFetch;
+        for (const [key, value] of Object.entries(previousEnv)) {
+            if (value === undefined) delete process.env[key];
+            else process.env[key] = value;
+        }
+    }
+});
