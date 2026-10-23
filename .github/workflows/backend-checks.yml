@@ -5,6 +5,7 @@ on:
     branches:
       - main
       - fix/production-backend-from-tested-core
+      - fix/linc-backend-clean-pr
   pull_request:
     branches:
       - main
@@ -16,10 +17,10 @@ jobs:
       - name: Check out repository
         uses: actions/checkout@v4
       - name: Set up Node.js
-        uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: npm
+        uses: actions/setup-node@v4
       - name: Install locked dependencies
         run: npm ci
       - name: Run unit tests
