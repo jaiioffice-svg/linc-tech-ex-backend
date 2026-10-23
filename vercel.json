@@ -6,5 +6,11 @@
   ],
   "routes": [
     { "src": "/(.*)", "dest": "server.js" }
+  ],
+  "crons": [
+    {
+      "path": "/api/cron/check-heartbeats",
+      "schedule": "0 0 * * *"
+    }
   ]
 }
