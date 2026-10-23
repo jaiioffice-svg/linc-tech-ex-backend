@@ -1,53 +1,70 @@
-const { readDB, writeDB } = require('./db');
+const { getUser, saveUser } = require('./db');
 
-exports.handleHeartbeat = (req, res) => {
+function sendError(res, error, action) {
+    const status = error && ['DB_NOT_CONFIGURED', 'DB_UNAVAILABLE', 'DB_PERMISSION_DENIED'].includes(error.code) ? 503 : 500;
+    console.error(`[${action}] request failed`, error && error.code ? error.code : 'INTERNAL_ERROR');
+    const message = status === 503
+        ? 'Required database service is not configured or is temporarily unavailable'
+        : 'Internal server error';
+    return res.status(status).json({ success: false, message });
+}
+
+exports.handleHeartbeat = async (req, res) => {
     try {
-        const { userId, grade } = req.body;
-        if (!userId) return res.status(400).json({ success: false, message: 'Missing core identifier' });
-
-        const db = readDB();
-        const now = Date.now();
-
-        if (!db.users[userId]) {
-            db.users[userId] = {
-                userId: userId,
-                grade: grade || 'M1',
-                guardianLineId: req.body.guardianLineId || 'SUPER_ADMIN_LINE_ID',
-                createdAt: now
-            };
+        const { userId, grade, guardianLineId } = req.body || {};
+        if (typeof userId !== 'string' || !userId.trim()) {
+            return res.status(400).json({ success: false, message: 'Missing core identifier' });
+        }
+        if (userId.length > 128) {
+            return res.status(400).json({ success: false, message: 'Invalid user identifier' });
         }
 
-        db.users[userId].lastHeartbeat = now;
-        db.users[userId].status = 'active';
-        writeDB(db);
+        const now = Date.now();
+        const existingUser = await getUser(userId);
+        const user = existingUser || {
+            userId,
+            grade: typeof grade === 'string' && grade.trim() ? grade.trim() : 'M1',
+            guardianLineId: typeof guardianLineId === 'string' && guardianLineId.trim() ? guardianLineId.trim() : null,
+            createdAt: now
+        };
+
+        if (existingUser && typeof grade === 'string' && grade.trim()) user.grade = grade.trim();
+        if (typeof guardianLineId === 'string' && guardianLineId.trim()) user.guardianLineId = guardianLineId.trim();
+        user.lastHeartbeat = now;
+        user.status = 'active';
+        await saveUser(user);
 
         return res.status(200).json({ success: true, message: 'Heartbeat acknowledged' });
     } catch (error) {
-        return res.status(500).json({ success: false, message: error.message });
+        return sendError(res, error, 'HEARTBEAT');
     }
 };
 
-exports.handleImmediateDelete = (req, res, triggerAlertCallback) => {
+exports.handleImmediateDelete = async (req, res, triggerAlertCallback) => {
     try {
-        const { userId } = req.body;
-        const db = readDB();
-        
-        if (!userId || !db.users[userId]) {
+        const { userId } = req.body || {};
+        if (typeof userId !== 'string' || !userId.trim()) {
+            return res.status(400).json({ success: false, message: 'Missing core identifier' });
+        }
+
+        const targetUser = await getUser(userId);
+        if (!targetUser) {
             return res.status(404).json({ success: false, message: 'Target profile not found' });
         }
 
-        const targetUser = db.users[userId];
         targetUser.status = 'app_deleted';
-        writeDB(db);
+        await saveUser(targetUser);
 
-        triggerAlertCallback({
-            userId: userId,
-            guardianLineId: targetUser.guardianLineId,
-            reason: 'APP_TERMINATION_SIGNAL'
-        });
+        if (typeof triggerAlertCallback === 'function') {
+            triggerAlertCallback({
+                userId,
+                guardianLineId: targetUser.guardianLineId || null,
+                reason: 'APP_TERMINATION_SIGNAL'
+            });
+        }
 
-        return res.status(200).json({ success: true, message: 'Termination signal propagated' });
+        return res.status(200).json({ success: true, message: 'Termination event recorded' });
     } catch (error) {
-        return res.status(500).json({ success: false, message: error.message });
+        return sendError(res, error, 'IMMEDIATE_DELETE');
     }
 };
