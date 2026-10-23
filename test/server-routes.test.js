@@ -216,3 +216,67 @@ test('readiness fails closed when Supabase configuration is missing in a Vercel 
         else process.env.VERCEL_ENV = previousVercelEnv;
     }
 });
+
+test('heartbeat rejects invalid user identifiers before any database access', async () => {
+    const previousKey = process.env.LINC_API_KEY;
+    process.env.LINC_API_KEY = 'identifier-validation-test-secret';
+
+    try {
+        const cases = [
+            { name: 'missing identifier', payload: {} },
+            { name: 'non-string identifier', payload: { userId: 123 } },
+            { name: 'blank identifier', payload: { userId: '   ' } },
+            { name: 'oversized identifier', payload: { userId: 'x'.repeat(129) } }
+        ];
+
+        for (const testCase of cases) {
+            const response = await fetch(`${baseUrl}/api/v1/heartbeat`, {
+                method: 'POST',
+                headers: {
+                    'content-type': 'application/json',
+                    'x-linc-api-key': 'identifier-validation-test-secret'
+                },
+                body: JSON.stringify(testCase.payload)
+            });
+            const body = await response.json();
+
+            assert.equal(response.status, 400, testCase.name);
+            assert.equal(body.success, false, testCase.name);
+        }
+    } finally {
+        if (previousKey === undefined) delete process.env.LINC_API_KEY;
+        else process.env.LINC_API_KEY = previousKey;
+    }
+});
+
+test('immediate-delete rejects invalid user identifiers before any database access', async () => {
+    const previousKey = process.env.LINC_API_KEY;
+    process.env.LINC_API_KEY = 'delete-identifier-test-secret';
+
+    try {
+        const cases = [
+            { name: 'missing identifier', payload: {} },
+            { name: 'non-string identifier', payload: { userId: 123 } },
+            { name: 'blank identifier', payload: { userId: '   ' } },
+            { name: 'oversized identifier', payload: { userId: 'x'.repeat(129) } }
+        ];
+
+        for (const testCase of cases) {
+            const response = await fetch(`${baseUrl}/api/v1/alert/delete`, {
+                method: 'POST',
+                headers: {
+                    'content-type': 'application/json',
+                    'x-linc-api-key': 'delete-identifier-test-secret'
+                },
+                body: JSON.stringify(testCase.payload)
+            });
+            const body = await response.json();
+
+            assert.equal(response.status, 400, testCase.name);
+            assert.equal(body.success, false, testCase.name);
+        }
+    } finally {
+        if (previousKey === undefined) delete process.env.LINC_API_KEY;
+        else process.env.LINC_API_KEY = previousKey;
+    }
+});
