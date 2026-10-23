@@ -5,12 +5,12 @@ Scope: current backend branch `fix/supabase-readiness-diagnostics`.
 
 ## Latest verification (2026-10-24)
 
-- Latest branch commit checked: `5bd9d9ab3a03405b124f37684b664be59b784250` (`fix: drop legacy heartbeat timestamp default before conversion`).
-- GitHub Actions run #58 passed on this commit, including dependency installation and the test suite: https://github.com/jaiioffice-svg/linc-tech-ex-backend/actions/runs/40024338755.
-- Vercel Preview deployment `dpl_AerG2MdqFbqzipanUpx1EdwVJnTD` reached `READY`: https://linc-tech-ex-backend-hsx0q6s04-linc8.vercel.app/ . Production was not changed.
-- Latest Preview `GET /health` returned HTTP 200 with `status: operational`; `GET /ready` returned HTTP 200 with `status: ready` and `database: reachable`.
-- These checks validate dependency install, automated tests, deployment readiness, and database reachability only. They do **not** verify live application-data writes/reads, per-user authentication, ownership enforcement, or guardian notification delivery.
-- The timestamp conversion migration has **not** been applied to the live Supabase database. Verify live column types and existing timestamp semantics first. PR #6 remains open and Draft; do not merge or promote to Production until release blockers are resolved.
+- Latest branch commit checked: `dcd2eb266dd763b0535f7f084dbf1b79b4749566` (`docs: record live Supabase schema inspection`).
+- GitHub Actions run #65 passed for this commit, including the backend workflow: https://api.github.com/repos/jaiioffice-svg/linc-tech-ex-backend/actions/runs/40025998457.
+- Vercel Preview deployment `dpl_DdoscT7othiEv98u2owZBnjyrxhN` reached `READY`: https://linc-tech-ex-backend-fl4lh8ucu-linc8.vercel.app/ . Production was not changed.
+- Live Preview `GET /health` returned HTTP 200 with `status: operational`; `GET /ready` returned HTTP 200 with `status: ready` and `database: reachable`.
+- These checks validate CI, deployment readiness, and database reachability only. They do **not** verify live application-data writes/reads, per-user authentication, ownership enforcement, or guardian notification delivery.
+- The timestamp conversion migration has **not** been applied to the live Supabase database. PR #6 remains open and Draft; do not merge or promote to Production until release blockers are resolved.
 
 ## Live Supabase schema inspection (read-only, 2026-10-24)
 
@@ -23,25 +23,27 @@ The project owner ran an `information_schema.columns` query for `public.linc_use
 | `last_heartbeat` | `bigint` | yes | none |
 | `updated_at` | `timestamp with time zone` | no | `now()` |
 
-- The live column types already match the backend's expected storage types for `created_at` and `last_heartbeat`; no timestamp type conversion is needed based on this schema inspection.
+A read-only aggregate query returned one row:
+- `total_users = 1`, `created_at_present = 1`, `heartbeat_present = 1`.
+- `created_at = 1792764446600`; `last_heartbeat = 1792765054220`.
+- The values have the magnitude and spacing expected for Unix epoch milliseconds. Interpreting them as epoch milliseconds yields 2026-10-23 14:07:26.600 UTC and 2026-10-23 14:17:34.220 UTC, respectively. This is consistent with the backend's expected units, but does not independently prove these values correspond to the original event times.
+
+- The live column types already match the backend's expected storage types for `created_at` and `last_heartbeat`; no timestamp type conversion is needed based on this inspection.
 - The live `created_at` column lacks the epoch-millisecond default defined by the base migration. The backend currently supplies `created_at` explicitly on writes, but aligning the default would make the schema consistent.
 - `last_heartbeat` correctly has no default; `updated_at` correctly uses a timezone-aware timestamp with `now()`.
-- The values' unit/semantics have not yet been verified. Before treating existing values as epoch milliseconds, run a read-only range/format check. Do not run the conversion migration just to convert types that are already correct; if the migration is used to align the default, review its effects first.
+- Do not run the conversion migration just to convert types that are already correct. If the migration is used to align the default, review its effects first. A follow-up read-only comparison of `updated_at` against `last_heartbeat` can help validate timing consistency.
 
-## Current verified state
+## Earlier verified state
 
-- GitHub Actions run #55 passed on commit `851a91cc72805cab3e8018b739c7db7c76f115bb`: https://github.com/jaiioffice-svg/linc-tech-ex-backend/actions/runs/40023218385.
-- Vercel Preview deployment for that commit reached `READY`: `linc-tech-ex-backend-ppa73hrtd-linc8.vercel.app`. This is a Preview deployment; Production was not changed.
-- Latest live Preview `GET /health` returned HTTP 200 with `status: operational`.
-- Latest live Preview `GET /ready` returned HTTP 200 with `status: ready` and `database: reachable`. This proves the readiness probe can reach Supabase, not that application data can be written/read end-to-end.
+- GitHub Actions run #58 passed on commit `5bd9d9ab3a03405b124f37684b664be59b784250`: https://github.com/jaiioffice-svg/linc-tech-ex-backend/actions/runs/40024338755.
+- Preview deployment `dpl_AerG2MdqFbqzipanUpx1EdwVJnTD` reached `READY`: https://linc-tech-ex-backend-hsx0q6s04-linc8.vercel.app/.
 - Added `docs/API_AUTH_CONTRACT.md` in commit `851a91c` to specify a proposed, explicitly unimplemented auth/client contract. It does not add or claim new runtime routes.
-- Vercel project settings show these environment-variable names targeted to Preview: `CRON_SECRET`, `LINC_API_KEY`, `SUPABASE_URL`, and `SUPABASE_SERVICE_ROLE_KEY`. Values were not retrieved or printed. Their presence in settings does not prove each value is valid.
+- Vercel Preview environment variable names observed: `CRON_SECRET`, `LINC_API_KEY`, `SUPABASE_URL`, and `SUPABASE_SERVICE_ROLE_KEY`. Values were not retrieved or printed. Their presence in settings does not prove each value is valid.
 - Live Preview `GET /api/user/linc-contract-audit-nonexistent` returned HTTP 404 `Cannot GET /api/user/...`, confirming the saved client snapshot's profile-restore endpoint is not implemented in this backend.
-- The current test suite includes controller tests, database adapter tests, LINE alert tests, API-key middleware tests, and HTTP-level rejection tests.
-- The HTTP security tests verify that missing/wrong API credentials are rejected for heartbeat/delete routes and that the cron route rejects missing credentials.
+- Tests include controller, database adapter, LINE alert, API-key middleware, and HTTP-level rejection coverage. The HTTP security tests verify that missing/wrong API credentials are rejected for heartbeat/delete routes and that the cron route rejects missing credentials.
 - Supabase service credentials are read by the backend from environment variables; they must never be embedded in a mobile/web client.
 - Heartbeat payloads do not set or replace `guardianLineId`. Guardian linking must be a separate verified consent flow.
-- The current shared `LINC_API_KEY` proves possession of an integration secret, not the identity or ownership of an individual user.
+- The shared `LINC_API_KEY` proves possession of an integration secret, not the identity or ownership of an individual user.
 
 ## Client integration audit
 
@@ -49,14 +51,14 @@ The project owner ran an `information_schema.columns` query for `public.linc_use
 - The currently connected GitHub integration exposes only `jaiioffice-svg/linc-tech-ex-backend`; no separate client repository was available to review during this audit.
 - The backend's current route set does not implement the client's `/api/user/{id}` profile endpoint. Do not assume the saved client snapshot and deployed backend are already integrated.
 - No Supabase Auth session/token flow was visible in the available client snapshot. Treat the auth provider and identity mapping as **unconfirmed**, not as an implemented capability.
-- The Vercel web-fetch capability used for this audit supports GET requests only, so it cannot establish successful authenticated POST heartbeat or DELETE-alert persistence. Those live write/read checks remain unverified.
+- The available Vercel URL-fetch capability supports GET requests only, so it cannot establish successful authenticated POST heartbeat or DELETE-alert persistence. Those live write/read checks remain unverified.
 
 ## Release blockers
 
 1. **Per-user authentication and ownership are not complete.** A request authenticated only by the shared API key can submit a caller-chosen `userId`. Do not treat this key as user authentication, and do not ship it as a secret embedded in a client.
 2. **Client/backend contract is unverified.** The saved client snapshot calls `/api/user/{id}`, while this backend has no matching route; the live client repository and sign-in mechanism must be identified before wiring identity securely.
 3. **Live database write/read has not been demonstrated end-to-end** against the current Preview deployment with a controlled test identity.
-4. **Timestamp migration requires live-schema verification.** Do not apply `20261024_002_convert_heartbeat_timestamps_to_epoch_ms.sql` until the actual column types and interpretation of existing timestamp values have been checked in the intended Supabase project.
+4. **Timestamp semantics are only partially verified.** Live column types and numeric magnitudes are consistent with epoch milliseconds, but exact event-time semantics remain unconfirmed. Do not apply `20261024_002_convert_heartbeat_timestamps_to_epoch_ms.sql` just to convert columns already typed as `bigint`.
 5. **Guardian linking and LINE delivery are not production-verified.** Keep outbound alerts disabled until a verified linking/consent flow and a safe test recipient have been confirmed.
 6. **Production promotion and PR merge remain gated** until the above release blockers are resolved and regression tests pass.
 
