@@ -11,11 +11,28 @@ The reviewed client archive and the standalone backend currently expose differen
 
 The client archive also contains placeholder guardian details and an `encryptedFullName` value that is obfuscation rather than cryptographic encryption. The guardian confirmation handler appears to accept a client-supplied LINE user ID without independently validating it with LINE. These must be treated as unresolved security issues, not as verified identity or encryption.
 
-## Decision proposal
+## Identity decision gate (must be resolved before implementation)
 
-For the device-first MVP, use **server-issued opaque user sessions** as the application identity contract, because the reviewed client already expects a session token and a forced account-provider login would be a larger product/onboarding change.
+**No identity provider or session strategy is approved yet.** The reviewed archive contains a custom session-token pattern, but that alone does not prove it is the current deployed client flow or satisfy account recovery, multi-device access, and identity-assurance needs. The separate `docs/API_AUTH_CONTRACT.md` proposal correctly requires confirmation of the actual sign-in provider before implementation.
 
-1. The server generates a cryptographically random session token only after an explicit account-creation or recovery flow.
+Evaluate these candidates against the real client and product requirements:
+
+- **Existing provider authentication (for example, Supabase Auth if confirmed):** preferred when the deployed client already uses it or account recovery/multi-device identity is required. The backend must validate provider-issued access tokens and map the verified principal to a L!nc profile.
+- **Custom opaque sessions:** acceptable only if product owners explicitly confirm a device-first, account-light MVP and define recovery, device replacement, expiry, revocation, and abuse controls. A session token is a bearer credential, not proof of a human identity by itself.
+
+Before choosing, inspect the deployed client build and all sign-in/setup/recovery call sites, then document the chosen option and migration plan. Do not implement both systems in parallel or silently switch the identity model.
+
+The security invariants below apply regardless of which candidate is selected:
+
+1. Only a trusted server-side verifier may establish the caller principal.
+2. Every user-scoped endpoint derives the owner from that verified principal/session. If a route includes a user ID, compare it to the verified owner and reject mismatches with 403. Never trust a user ID supplied by the client alone.
+3. Keep `LINC_API_KEY` restricted to server-to-server jobs. It must not authenticate mobile/web users.
+4. Do not mark a guardian as linked until a short-lived, single-use pairing challenge has been completed and the guardian identity is verified by a trusted LINE platform callback/API flow. A client-submitted LINE ID alone is not proof.
+5. Remove placeholder phone numbers and LINE IDs. An unpaired guardian is represented explicitly as unpaired; no fabricated values.
+6. Do not label a value encrypted unless real authenticated encryption is implemented with managed keys and a documented rotation plan. Otherwise store only what is necessary and use clear field names.
+7. Keep durable user, session, guardian-link, and alert state in the database. Do not rely on a local JSON file for production persistence or cross-instance coordination.
+
+The remaining API contract and tests in this ADR are acceptance requirements, not authorization to choose a specific identity provider.
 2. Persist only a cryptographic hash of the token in the database; return the raw token once to the client.
 3. Store expiry, revocation state, creation time, and a server-owned user ID for every session.
 4. Every user-scoped endpoint derives the owner from the validated session. If a route includes a user ID, compare it to the session owner and reject mismatches with 403. Never trust a user ID supplied by the client alone.
