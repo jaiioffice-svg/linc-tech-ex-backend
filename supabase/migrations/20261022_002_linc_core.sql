@@ -6,13 +6,16 @@ create table if not exists public.linc_users (
     grade text not null default 'M1',
     guardian_line_id text null,
     created_at bigint not null,
-    last_heartbeat bigint not null,
+    last_heartbeat bigint null,
     status text not null default 'active'
         check (status in ('active', 'missing', 'app_deleted')),
     data jsonb not null default '{}'::jsonb,
     inserted_at timestamptz not null default now(),
     updated_at timestamptz not null default now()
 );
+
+-- Existing installations may already have the original NOT NULL constraint.
+alter table public.linc_users alter column last_heartbeat drop not null;
 
 create index if not exists linc_users_status_last_heartbeat_idx
     on public.linc_users (status, last_heartbeat);
