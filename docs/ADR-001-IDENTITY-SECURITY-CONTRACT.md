@@ -32,17 +32,6 @@ The security invariants below apply regardless of which candidate is selected:
 6. Do not label a value encrypted unless real authenticated encryption is implemented with managed keys and a documented rotation plan. Otherwise store only what is necessary and use clear field names.
 7. Keep durable user, session, guardian-link, and alert state in the database. Do not rely on a local JSON file for production persistence or cross-instance coordination.
 
-The remaining API contract and tests in this ADR are acceptance requirements, not authorization to choose a specific identity provider.
-2. Persist only a cryptographic hash of the token in the database; return the raw token once to the client.
-3. Store expiry, revocation state, creation time, and a server-owned user ID for every session.
-4. Every user-scoped endpoint derives the owner from the validated session. If a route includes a user ID, compare it to the session owner and reject mismatches with 403. Never trust a user ID supplied by the client alone.
-5. Keep `LINC_API_KEY` restricted to server-to-server jobs. It must not authenticate mobile/web users.
-6. Do not mark a guardian as linked until a short-lived, single-use pairing challenge has been completed and the guardian identity is verified by a trusted LINE platform callback/API flow. A client-submitted LINE ID alone is not proof.
-7. Remove placeholder phone numbers and LINE IDs. An unpaired guardian is represented explicitly as unpaired; no fabricated values.
-8. Do not label a value encrypted unless real authenticated encryption is implemented with managed keys and a documented rotation plan. Otherwise store only what is necessary and use clear field names.
-9. Keep durable user, session, guardian-link, and alert state in the database. Do not rely on a local JSON file for production persistence or cross-instance coordination.
-
-This decision is a proposal for the existing device-first experience; it does not preclude adding Supabase Auth later if account recovery, multi-device access, or identity assurance requirements change.
 
 ## Minimum API contract to agree before implementation
 
