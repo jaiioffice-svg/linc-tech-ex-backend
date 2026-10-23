@@ -95,6 +95,11 @@ test('HTTP API rejects malformed JSON before route handlers run', async t => {
             body: '{"userId":'
         });
         assert.equal(response.status, 400);
+        assert.match(response.headers.get('content-type') || '', /application\\/json/);
+        assert.deepEqual(await response.json(), {
+            success: false,
+            message: 'Invalid JSON request body'
+        });
     });
 });
 
@@ -109,5 +114,10 @@ test('HTTP API enforces the configured JSON body size limit', async t => {
             body: JSON.stringify({ userId: 'x'.repeat(40 * 1024) })
         });
         assert.equal(response.status, 413);
+        assert.match(response.headers.get('content-type') || '', /application\\/json/);
+        assert.deepEqual(await response.json(), {
+            success: false,
+            message: 'Request body too large'
+        });
     });
 });
