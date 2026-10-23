@@ -184,3 +184,35 @@ test('immediate-delete endpoint rejects missing or incorrect service API keys be
         else process.env.LINC_API_KEY = previousKey;
     }
 });
+
+test('readiness fails closed when Supabase configuration is missing in a Vercel runtime', async () => {
+    const previousUrl = process.env.SUPABASE_URL;
+    const previousServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+    const previousVercel = process.env.VERCEL;
+    const previousVercelEnv = process.env.VERCEL_ENV;
+
+    delete process.env.SUPABASE_URL;
+    delete process.env.SUPABASE_SERVICE_ROLE_KEY;
+    process.env.VERCEL = '1';
+    delete process.env.VERCEL_ENV;
+
+    try {
+        const response = await fetch(`${baseUrl}/ready`);
+        const body = await response.json();
+
+        assert.equal(response.status, 503);
+        assert.deepEqual(body, {
+            status: 'not_ready',
+            reason: 'database_not_configured'
+        });
+    } finally {
+        if (previousUrl === undefined) delete process.env.SUPABASE_URL;
+        else process.env.SUPABASE_URL = previousUrl;
+        if (previousServiceKey === undefined) delete process.env.SUPABASE_SERVICE_ROLE_KEY;
+        else process.env.SUPABASE_SERVICE_ROLE_KEY = previousServiceKey;
+        if (previousVercel === undefined) delete process.env.VERCEL;
+        else process.env.VERCEL = previousVercel;
+        if (previousVercelEnv === undefined) delete process.env.VERCEL_ENV;
+        else process.env.VERCEL_ENV = previousVercelEnv;
+    }
+});
