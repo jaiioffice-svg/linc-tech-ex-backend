@@ -53,7 +53,10 @@ app.get('/ready', async (req, res) => {
             code: error && error.code ? error.code : 'INTERNAL_ERROR',
             status: Number.isInteger(error && error.status) ? error.status : null,
             supabaseCode: error && error.supabaseCode ? error.supabaseCode : null,
-            supabaseMessage: error && error.supabaseMessage ? error.supabaseMessage : null
+            supabaseMessage: error && error.supabaseMessage ? error.supabaseMessage : null,
+            supabaseHost: error && error.supabaseHost ? error.supabaseHost : null,
+            serviceKeyFormat: error && error.serviceKeyFormat ? error.serviceKeyFormat : null,
+            serviceKeyRole: error && error.serviceKeyRole ? error.serviceKeyRole : null
         }));
         return res.status(503).json({ status: 'not_ready', reason: 'database_unavailable' });
     }
