@@ -60,6 +60,36 @@ function normalizeSupabaseUser(row) {
     };
 }
 
+function supabaseDiagnosticContext() {
+    let supabaseHost = null;
+    try {
+        supabaseHost = new URL(supabaseBaseUrl()).host;
+    } catch (_) {
+        // Do not log malformed or secret-bearing URL values.
+    }
+
+    // Decode only the non-secret JWT role claim; never log the token itself.
+    let serviceKeyRole = null;
+    let serviceKeyFormat = 'unknown';
+    const key = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
+    const parts = key.split('.');
+    if (parts.length === 3) {
+        serviceKeyFormat = 'jwt';
+        try {
+            const payload = JSON.parse(Buffer.from(parts[1], 'base64url').toString('utf8'));
+            serviceKeyRole = typeof payload.role === 'string' ? payload.role.slice(0, 40) : null;
+        } catch (_) {
+            serviceKeyRole = 'unreadable_jwt_payload';
+        }
+    } else if (key.startsWith('sb_secret_')) {
+        serviceKeyFormat = 'supabase_secret_key';
+    } else if (key) {
+        serviceKeyFormat = 'non_jwt_key';
+    }
+
+    return { supabaseHost, serviceKeyFormat, serviceKeyRole };
+}
+
 function supabaseBaseUrl() {
     const value = process.env.SUPABASE_URL;
     if (!value) {
@@ -97,9 +127,42 @@ async function supabaseRequest(resource, options = {}) {
     }
 
     if (!response.ok) {
+        // Read the PostgREST error payload for server-side diagnosis, but never
+        // return it to clients because upstream messages may expose schema details.
+        let upstream = null;
+        try {
+            const raw = await response.text();
+            if (raw) {
+                try {
+                    upstream = JSON.parse(raw);
+                } catch (_) {
+                    upstream = { message: raw };
+                }
+            }
+        } catch (_) {
+            // Preserve the HTTP status if the error body cannot be read.
+        }
+
+        const upstreamCode = upstream && typeof upstream.code === 'string'
+            ? upstream.code.slice(0, 40)
+            : null;
+        const upstreamMessage = upstream && typeof upstream.message === 'string'
+            ? upstream.message.replace(/[\r\n\t]+/g, ' ').slice(0, 180)
+            : null;
+
         const error = new Error('Database request failed');
-        error.code = response.status === 401 || response.status === 403 ? 'DB_PERMISSION_DENIED' : 'DB_UNAVAILABLE';
         error.status = response.status;
+        error.supabaseCode = upstreamCode;
+        error.supabaseMessage = upstreamMessage;
+        Object.assign(error, supabaseDiagnosticContext());
+
+        if (response.status === 401 || response.status === 403 || upstreamCode === '42501') {
+            error.code = 'DB_PERMISSION_DENIED';
+        } else if (upstreamCode === 'PGRST125') {
+            error.code = 'DB_INVALID_URL';
+        } else {
+            error.code = 'DB_UNAVAILABLE';
+        }
         throw error;
     }
 

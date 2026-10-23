@@ -1,13 +1,14 @@
 -- L!nc backend persistence schema.
--- Apply this migration to the intended Supabase project before testing writes.
+-- created_at and last_heartbeat are epoch milliseconds (BIGINT), matching db.js.
+-- updated_at is a timestamp maintained as an ISO string.
 -- The service-role key is used only by the server; never expose it to a client.
 
 create table if not exists public.linc_users (
     user_id text primary key,
     grade text not null default 'M1',
     guardian_line_id text,
-    created_at timestamptz not null default now(),
-    last_heartbeat timestamptz,
+    created_at bigint not null default ((extract(epoch from now()) * 1000)::bigint),
+    last_heartbeat bigint,
     status text not null default 'active',
     updated_at timestamptz not null default now()
 );
@@ -16,8 +17,8 @@ create table if not exists public.linc_users (
 alter table public.linc_users
     add column if not exists grade text not null default 'M1',
     add column if not exists guardian_line_id text,
-    add column if not exists created_at timestamptz not null default now(),
-    add column if not exists last_heartbeat timestamptz,
+    add column if not exists created_at bigint not null default ((extract(epoch from now()) * 1000)::bigint),
+    add column if not exists last_heartbeat bigint,
     add column if not exists status text not null default 'active',
     add column if not exists updated_at timestamptz not null default now();
 

@@ -99,3 +99,27 @@ test('getStaleActiveUsers queries active rows older than the cutoff', async t =>
     assert.match(requestedUrl, /status=eq\.active/);
     assert.match(requestedUrl, /last_heartbeat=lt\./);
 });
+
+test('database diagnostic messages remove control characters and preserve safe error codes', async t => {
+    setTestEnvironment(t);
+    const previousFetch = global.fetch;
+    t.after(() => { global.fetch = previousFetch; });
+    global.fetch = async () => new Response(JSON.stringify({
+        code: '42501',
+        message: 'permission denied' + String.fromCharCode(10, 9) + 'for table access'
+    }), {
+        status: 403,
+        headers: { 'content-type': 'application/json' }
+    });
+
+    await assert.rejects(
+        loadDb().getUser('diagnostic-test-user'),
+        error => {
+            assert.equal(error.code, 'DB_PERMISSION_DENIED');
+            assert.equal(error.supabaseCode, '42501');
+            assert.equal(error.supabaseMessage, 'permission denied for table access');
+            assert.doesNotMatch(error.supabaseMessage, /[\r\n\t]/);
+            return true;
+        }
+    );
+});

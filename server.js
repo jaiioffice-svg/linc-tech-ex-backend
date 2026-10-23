@@ -49,7 +49,15 @@ app.get('/ready', async (req, res) => {
         await getUser('__linc_readiness_probe_nonexistent__');
         return res.status(200).json({ status: 'ready', database: 'reachable' });
     } catch (error) {
-        console.error('[READINESS] database check failed', error && error.code ? error.code : 'INTERNAL_ERROR');
+        console.error('[READINESS] database check failed', JSON.stringify({
+            code: error && error.code ? error.code : 'INTERNAL_ERROR',
+            status: Number.isInteger(error && error.status) ? error.status : null,
+            supabaseCode: error && error.supabaseCode ? error.supabaseCode : null,
+            supabaseMessage: error && error.supabaseMessage ? error.supabaseMessage : null,
+            supabaseHost: error && error.supabaseHost ? error.supabaseHost : null,
+            serviceKeyFormat: error && error.serviceKeyFormat ? error.serviceKeyFormat : null,
+            serviceKeyRole: error && error.serviceKeyRole ? error.serviceKeyRole : null
+        }));
         return res.status(503).json({ status: 'not_ready', reason: 'database_unavailable' });
     }
 });
@@ -78,6 +86,19 @@ app.get('/api/cron/check-heartbeats', async (req, res) => {
         console.error('[HEARTBEAT_CRON] run failed', error && error.code ? error.code : 'INTERNAL_ERROR');
         return res.status(503).json({ success: false, message: 'Heartbeat check is unavailable' });
     }
+});
+
+
+// Return safe JSON errors for body-parser failures instead of Express's default
+// HTML error response. Never expose parser internals or request payload fragments.
+app.use((error, req, res, next) => {
+    if (error && error.type === 'entity.parse.failed') {
+        return res.status(400).json({ success: false, message: 'Invalid JSON request body' });
+    }
+    if (error && error.type === 'entity.too.large') {
+        return res.status(413).json({ success: false, message: 'Request body too large' });
+    }
+    return next(error);
 });
 
 if (require.main === module) {

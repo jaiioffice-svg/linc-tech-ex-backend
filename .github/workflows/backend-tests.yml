@@ -6,10 +6,12 @@ on:
       - main
       - fix/vercel-readonly-filesystem
       - fix/heartbeat-guardian-security
+      - fix/supabase-readiness-diagnostics
   pull_request:
     branches:
       - main
       - fix/vercel-readonly-filesystem
+      - fix/heartbeat-guardian-security
 
 jobs:
   test:
