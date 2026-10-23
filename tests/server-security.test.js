@@ -70,3 +70,44 @@ test('heartbeat cron endpoint rejects missing bearer credentials', async t => {
         assert.equal(response.status, 401);
     });
 });
+
+test('heartbeat cron endpoint rejects an incorrect bearer secret', async t => {
+    await withServer(t, async baseUrl => {
+        const response = await fetch(`${baseUrl}/api/cron/check-heartbeats`, {
+            headers: { authorization: 'Bearer incorrect-test-cron-secret' }
+        });
+        assert.equal(response.status, 401);
+        assert.deepEqual(await response.json(), {
+            success: false,
+            message: 'Unauthorized'
+        });
+    });
+});
+
+test('HTTP API rejects malformed JSON before route handlers run', async t => {
+    await withServer(t, async baseUrl => {
+        const response = await fetch(`${baseUrl}/api/v1/heartbeat`, {
+            method: 'POST',
+            headers: {
+                'content-type': 'application/json',
+                'x-linc-api-key': 'test-only-api-key'
+            },
+            body: '{"userId":'
+        });
+        assert.equal(response.status, 400);
+    });
+});
+
+test('HTTP API enforces the configured JSON body size limit', async t => {
+    await withServer(t, async baseUrl => {
+        const response = await fetch(`${baseUrl}/api/v1/heartbeat`, {
+            method: 'POST',
+            headers: {
+                'content-type': 'application/json',
+                'x-linc-api-key': 'test-only-api-key'
+            },
+            body: JSON.stringify({ userId: 'x'.repeat(40 * 1024) })
+        });
+        assert.equal(response.status, 413);
+    });
+});
