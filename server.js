@@ -49,7 +49,12 @@ app.get('/ready', async (req, res) => {
         await getUser('__linc_readiness_probe_nonexistent__');
         return res.status(200).json({ status: 'ready', database: 'reachable' });
     } catch (error) {
-        console.error('[READINESS] database check failed', error && error.code ? error.code : 'INTERNAL_ERROR');
+        console.error('[READINESS] database check failed', JSON.stringify({
+            code: error && error.code ? error.code : 'INTERNAL_ERROR',
+            status: Number.isInteger(error && error.status) ? error.status : null,
+            supabaseCode: error && error.supabaseCode ? error.supabaseCode : null,
+            supabaseMessage: error && error.supabaseMessage ? error.supabaseMessage : null
+        }));
         return res.status(503).json({ status: 'not_ready', reason: 'database_unavailable' });
     }
 });
