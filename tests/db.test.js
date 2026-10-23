@@ -117,7 +117,7 @@ test('database diagnostic messages remove control characters and preserve safe e
         error => {
             assert.equal(error.code, 'DB_PERMISSION_DENIED');
             assert.equal(error.supabaseCode, '42501');
-            assert.equal(error.supabaseMessage, 'permission denied  for table access');
+            assert.equal(error.supabaseMessage, 'permission denied for table access');
             assert.doesNotMatch(error.supabaseMessage, /[\\r\\n\\t]/);
             return true;
         }
