@@ -5,11 +5,10 @@ Scope: current backend branch `fix/supabase-readiness-diagnostics`.
 
 ## Latest verification (2026-10-24)
 
-- Latest branch commit checked: `13c43c0cacf2cea078dcf5f91720b41659d83051` (`docs: record latest preview and timestamp checks`).
-- GitHub Actions run #67 passed for this commit: https://api.github.com/repos/jaiioffice-svg/linc-tech-ex-backend/actions/runs/40026993869.
-- Vercel Preview deployment `dpl_F72RcYe3vgpywwR84EjKUPVHzkxw` reached `READY`: https://linc-tech-ex-backend-5hhli0yqa-linc8.vercel.app/ . Production was not changed.
-- Live Preview `GET /health` returned HTTP 200 with `status: operational`; `GET /ready` returned HTTP 200 with `status: ready` and `database: reachable`.
-- These checks validate CI, deployment readiness, and database reachability only. They do **not** verify live application-data writes/reads, per-user authentication, ownership enforcement, or guardian notification delivery.
+- Latest branch commit checked: `af3025553511d8eae82a2c9717e3ec24b44d513a` (`docs: record latest preview and timestamp comparison`).
+- Vercel Preview deployment `dpl_B6knapvpTJMhctYFXAEEcaBrbjsB` reached `READY` for this commit: https://linc-tech-ex-backend-8nzd20vlg-linc8.vercel.app/ . Production was not changed.
+- On this exact Preview URL, `GET /health` returned HTTP 200 with `status: operational`; `GET /ready` returned HTTP 200 with `status: ready` and `database: reachable` after the deployment became READY.
+- These checks validate deployment readiness and database reachability only. They do **not** verify live application-data writes/reads, per-user authentication, ownership enforcement, or guardian notification delivery. A separate workflow-run result for this commit was not confirmed in this follow-up.
 - The timestamp conversion migration has **not** been applied to the live Supabase database. PR #6 remains open and Draft; do not merge or promote to Production until release blockers are resolved.
 
 ## Live Supabase schema inspection (read-only, 2026-10-24)
