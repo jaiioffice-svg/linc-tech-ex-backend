@@ -121,3 +121,47 @@ test('HTTP API enforces the configured JSON body size limit', async t => {
         });
     });
 });
+
+
+test('HTTP API fails closed with 503 when the server API key is not configured', async t => {
+    await withServer(t, async baseUrl => {
+        const configuredKey = process.env.LINC_API_KEY;
+        try {
+            delete process.env.LINC_API_KEY;
+            const response = await fetch(`${baseUrl}/api/v1/heartbeat`, {
+                method: 'POST',
+                headers: {
+                    'content-type': 'application/json',
+                    'x-linc-api-key': 'test-only-api-key'
+                },
+                body: JSON.stringify({ userId: 'auth-config-test-user' })
+            });
+            assert.equal(response.status, 503);
+            assert.deepEqual(await response.json(), {
+                success: false,
+                message: 'API authentication is not configured'
+            });
+        } finally {
+            process.env.LINC_API_KEY = configuredKey;
+        }
+    });
+});
+
+test('heartbeat cron endpoint fails closed with 503 when its secret is not configured', async t => {
+    await withServer(t, async baseUrl => {
+        const configuredSecret = process.env.CRON_SECRET;
+        try {
+            delete process.env.CRON_SECRET;
+            const response = await fetch(`${baseUrl}/api/cron/check-heartbeats`, {
+                headers: { authorization: 'Bearer test-only-cron-secret' }
+            });
+            assert.equal(response.status, 503);
+            assert.deepEqual(await response.json(), {
+                success: false,
+                message: 'Cron authentication is not configured'
+            });
+        } finally {
+            process.env.CRON_SECRET = configuredSecret;
+        }
+    });
+});
