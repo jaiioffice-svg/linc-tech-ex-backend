@@ -106,7 +106,7 @@ test('database diagnostic messages remove control characters and preserve safe e
     t.after(() => { global.fetch = previousFetch; });
     global.fetch = async () => new Response(JSON.stringify({
         code: '42501',
-        message: 'permission denied\\n\\tfor table access'
+        message: 'permission denied' + String.fromCharCode(10, 9) + 'for table access'
     }), {
         status: 403,
         headers: { 'content-type': 'application/json' }
@@ -118,7 +118,7 @@ test('database diagnostic messages remove control characters and preserve safe e
             assert.equal(error.code, 'DB_PERMISSION_DENIED');
             assert.equal(error.supabaseCode, '42501');
             assert.equal(error.supabaseMessage, 'permission denied for table access');
-            assert.doesNotMatch(error.supabaseMessage, /[\\r\\n\\t]/);
+            assert.doesNotMatch(error.supabaseMessage, /[\r\n\t]/);
             return true;
         }
     );
