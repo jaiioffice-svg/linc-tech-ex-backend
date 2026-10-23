@@ -5,21 +5,25 @@ Scope: current backend branch `fix/supabase-readiness-diagnostics`.
 
 ## Current verified state
 
-- GitHub Actions runs the Node test suite on pushes to the diagnostics branch.
+- GitHub Actions run #50 passed on commit `49e46eea5f1a4f724163d33cdb382d64c6bf2339`.
+- Vercel Preview deployment for that commit reached `READY`: `linc-tech-ex-backend-77620egrs-linc8.vercel.app`. This is a Preview deployment; Production was not changed.
+- Live Preview `GET /health` returned HTTP 200 with `status: operational`.
+- Live Preview `GET /ready` returned HTTP 200 with `status: ready` and `database: reachable`. This proves the readiness probe can reach Supabase, not that application data can be written/read end-to-end.
+- Vercel project settings show these environment-variable names targeted to Preview: `CRON_SECRET`, `LINC_API_KEY`, `SUPABASE_URL`, and `SUPABASE_SERVICE_ROLE_KEY`. Values were not retrieved or printed. Their presence in settings does not prove each value is valid.
+- Live Preview `GET /api/user/linc-contract-audit-nonexistent` returned HTTP 404 `Cannot GET /api/user/...`, confirming the saved client snapshot's profile-restore endpoint is not implemented in this backend.
 - The current test suite includes controller tests, database adapter tests, LINE alert tests, API-key middleware tests, and HTTP-level rejection tests.
 - The HTTP security tests verify that missing/wrong API credentials are rejected for heartbeat/delete routes and that the cron route rejects missing credentials.
 - Supabase service credentials are read by the backend from environment variables; they must never be embedded in a mobile/web client.
 - Heartbeat payloads do not set or replace `guardianLineId`. Guardian linking must be a separate verified consent flow.
-- The readiness route checks whether Supabase is reachable. A successful readiness response is not proof that authenticated writes and reads work end-to-end.
 - The current shared `LINC_API_KEY` proves possession of an integration secret, not the identity or ownership of an individual user.
 
 ## Client integration audit
 
 - The available saved client snapshot (`App.tsx`) restores a profile using `localStorage` key `linc_current_user_id` and requests `/api/user/{id}`. This is a client-held identifier, not proof of identity.
-- The currently connected GitHub integration exposes only `jaiioffice-svg/linc-tech-ex-backend`; no separate client repository was available for review during this audit.
+- The currently connected GitHub integration exposes only `jaiioffice-svg/linc-tech-ex-backend`; no separate client repository was available to review during this audit.
 - The backend's current route set does not implement the client's `/api/user/{id}` profile endpoint. Do not assume the saved client snapshot and deployed backend are already integrated.
 - No Supabase Auth session/token flow was visible in the available client snapshot. Treat the auth provider and identity mapping as **unconfirmed**, not as an implemented capability.
-- Therefore, do not simply replace API-key middleware with Bearer-token checks until the client can obtain and send a server-verifiable user token. Do not make `userId` from localStorage authoritative.
+- The Vercel web-fetch capability used for this audit supports GET requests only, so it cannot establish successful authenticated POST heartbeat or DELETE-alert persistence. Those live write/read checks remain unverified.
 
 ## Release blockers
 
