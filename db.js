@@ -97,9 +97,41 @@ async function supabaseRequest(resource, options = {}) {
     }
 
     if (!response.ok) {
+        // Read the PostgREST error payload for server-side diagnosis, but never
+        // return it to clients because upstream messages may expose schema details.
+        let upstream = null;
+        try {
+            const raw = await response.text();
+            if (raw) {
+                try {
+                    upstream = JSON.parse(raw);
+                } catch (_) {
+                    upstream = { message: raw };
+                }
+            }
+        } catch (_) {
+            // Preserve the HTTP status if the error body cannot be read.
+        }
+
+        const upstreamCode = upstream && typeof upstream.code === 'string'
+            ? upstream.code.slice(0, 40)
+            : null;
+        const upstreamMessage = upstream && typeof upstream.message === 'string'
+            ? upstream.message.replace(/[\\r\\n\\t]+/g, ' ').slice(0, 180)
+            : null;
+
         const error = new Error('Database request failed');
-        error.code = response.status === 401 || response.status === 403 ? 'DB_PERMISSION_DENIED' : 'DB_UNAVAILABLE';
         error.status = response.status;
+        error.supabaseCode = upstreamCode;
+        error.supabaseMessage = upstreamMessage;
+
+        if (response.status === 401 || response.status === 403 || upstreamCode === '42501') {
+            error.code = 'DB_PERMISSION_DENIED';
+        } else if (upstreamCode === 'PGRST125') {
+            error.code = 'DB_INVALID_URL';
+        } else {
+            error.code = 'DB_UNAVAILABLE';
+        }
         throw error;
     }
 
