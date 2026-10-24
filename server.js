@@ -6,8 +6,35 @@ const { validateApiKey, requireVerifiedEndUser } = require('./auth');
 const { isDatabaseConfigured, checkDatabaseConnection, classifyDatabaseFailure } = require('./db');
 
 const app = express();
+
+function getAllowedOrigins() {
+    return (process.env.LINC_ALLOWED_ORIGINS || '')
+        .split(',')
+        .map(value => value.trim())
+        .filter(Boolean)
+        .filter(value => {
+            try {
+                const parsed = new URL(value);
+                return ['http:', 'https:'].includes(parsed.protocol) && parsed.origin === value;
+            } catch (_) {
+                return false;
+            }
+        });
+}
+
 app.use(express.json({ limit: '64kb' }));
-app.use(cors());
+// Never emit Access-Control-Allow-Origin: * for protected API routes.
+// Browser origins must be listed explicitly in LINC_ALLOWED_ORIGINS as a
+// comma-separated list of exact scheme/host/port origins. CORS is not auth.
+app.use(cors({
+    origin(origin, callback) {
+        if (typeof origin !== 'string' || !origin) {
+            // Non-browser/server-to-server requests do not need CORS headers.
+            return callback(null, true);
+        }
+        return callback(null, getAllowedOrigins().includes(origin));
+    }
+}));
 app.use(helmet());
 
 function sendEmergencySignal(alertPayload) {
