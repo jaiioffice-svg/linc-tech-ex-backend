@@ -296,3 +296,19 @@ Production still returns HTTP 500 `FUNCTION_INVOCATION_FAILED` for both health/r
 - `GET /ready`: `sin1::t97h2-1792830454833-3b0a829da6e8`.
 
 These requests were GET-only and made after the Candidate gained the signed BFF assertion verifier. No Production code/config change or deployment occurred. The new verifier is in the unmerged Candidate branch, the BFF signing integration is not yet connected, and `LINC_INTERNAL_AUTH_SECRET` is not configured for the live service. Production availability remains unresolved.
+
+
+## Durable assertion replay protection — current Candidate status (2026-10-24)
+
+This section supersedes earlier entries above that said the verifier only checked JTI format without consuming it. The current Candidate consumes each signed assertion JTI through the Supabase RPC `rpc/linc_consume_auth_assertion` after signature/claim validation and before controller execution. A body userId mismatch is rejected with 403 before consuming the JTI. A duplicate JTI is rejected with 401; unavailable or unconfigured replay storage fails closed with 503.
+
+Migration: `supabase/migrations/20261024_003_auth_assertion_replay.sql`. It creates an RLS-enabled table with a unique primary-key JTI, expiry index, an atomic consume function, direct-table revocation for `anon`/`authenticated`, and execute permission only for `service_role`. The function uses `search_path = pg_catalog, public, pg_temp` and notifies PostgREST to reload its schema cache after creation. The JTI store contains no user ID.
+
+Verification on exact Runtime/Test commit `201478ff7f49f510a39ad59c1f57b661c31cc331`:
+- Isolated Node 22 Sandbox: **71/71 tests passed**.
+- `npm ci`: 85 packages installed; `npm audit`: 0 vulnerabilities.
+- `node --check` passed for `server.js`, `db.js`, `error-handler.js`, `request-validation.js`, and `internal-assertion.js`.
+- Vercel config/branch-scope validation and `git diff --check` passed; working tree clean.
+- GitHub Actions [run #263](https://github.com/jaiioffice-svg/linc-tech-ex-backend/actions/runs/40079888142) succeeded.
+
+Important boundary: this run used mocked Supabase REST replies plus static migration-contract tests. The migration has **not** been executed against a database, and the SQL function has not been proven against live Postgres. Before a Preview rollout, confirm the exact non-production Supabase project, review its schema/grants/RLS, run this migration only after confirming Production isolation, then test duplicate JTI rejection and valid first-use assertions against that same Preview DB. Do not deploy/promote this Candidate, enable the BFF contract in Production, or send real LINE notifications as part of this step.
