@@ -1,6 +1,6 @@
 # L!nc Backend — release progress scoreboard
 
-**As of: 2026-10-24 18:26 Asia/Bangkok**  
+**As of: 2026-10-24 18:28 Asia/Bangkok**  
 **Scope:** first safely usable end-to-end Backend MVP, not the complete product UI. The approved/deployed Client source is not currently confirmed, so this is a conservative engineering estimate, not a claim that the whole L!nc app is this complete.
 
 ## Executive status
@@ -15,7 +15,7 @@ The Candidate removes the import-time JSON file write and adds a configured Supa
 - **Estimated path-to-MVP completion: about 30% done / 70% remaining.** This is a weighted estimate of release gates, not a count of code lines or commits.
 - **Current Production service: NOT operational.** A read-only probe returned HTTP 500 `FUNCTION_INVOCATION_FAILED` from both `/health` and `/ready` at 2026-10-24 10:45 UTC. The active Production deployment is still `dpl_2ELeGpWoXTL6wFFvLEXxrLZzRgAk`, from `main` SHA `336e2fcdd1b9f0841432817dcafe955b45700eef`.
 - Candidate PR #2 remains **Draft and unmerged**. The code branch has not been validated as a deployed end-to-end release. No Production deployment/configuration or persistent DB was changed.
-- Latest Candidate HEAD `95db39046e937e18a15d73ffebb9b98ec24df029` was verified by GitHub Actions [run #349](https://github.com/jaiioffice-svg/linc-tech-ex-backend/actions/runs/40089640235): **90 tests passed, 0 failed**. The latest security change rejects signed assertion claims outside the explicit allowlist (`iss`, `aud`, `sub`, `iat`, `exp`, `jti`, `scope`, optional `nbf`) before consuming the replay identifier. Integration coverage includes HTTP contracts and registration through the real Express middleware/controller with a mocked Supabase boundary. `npm ci`, `npm audit --audit-level=high` (**0 vulnerabilities**) and six-file `node --check` succeeded. CI does not prove live Supabase, BFF, LINE, current Preview deployment or Production integration.
+- Latest Candidate HEAD `6f7c340f774922ad71688b0f2f8477e20b9d13c1` was verified by GitHub Actions [run #355](https://github.com/jaiioffice-svg/linc-tech-ex-backend/actions/runs/40089776831): **90 tests passed, 0 failed**. The suite includes strict signed-assertion claim allowlisting, HTTP contract checks and registration through the real Express middleware/controller with a mocked Supabase boundary. The new [`docs/API_CONTRACT.md`](./API_CONTRACT.md) documents routes, statuses, auth and notification semantics, including that `blocked` does not mean a LINE message was sent. `npm ci`, `npm audit --audit-level=high` (**0 vulnerabilities**) and six-file `node --check` succeeded. CI does not prove live Supabase, BFF, LINE, current Preview deployment or Production integration.
 
 ## Percentage reporting correction — one fixed baseline from now on
 
@@ -38,7 +38,7 @@ The weighting is an explicit planning estimate for the **first safe end-to-end B
 | Workstream | Weight | Estimated completion | Contribution | Evidence / blocker |
 |---|---:|---:|---:|---|
 | Backend route/controller foundation, validation, ownership guards, outbox logic | 25% | 65% | 16.25% | Candidate code and regression coverage exist; verified session middleware is intentionally fail-closed until a trusted BFF is connected. |
-| Repeatable dependency install, audit and automated CI | 10% | 100% | 10% | Candidate HEAD `95db390`: run #349 passed 90 tests with zero failures, `npm audit --audit-level=high` reported 0 vulnerabilities and six runtime syntax checks passed; lockfile installation succeeded. This is not live integration proof. |
+| Repeatable dependency install, audit and automated CI | 10% | 100% | 10% | Candidate HEAD `6f7c340`: run #355 passed 90 tests with zero failures, `npm audit --audit-level=high` reported 0 vulnerabilities and six runtime syntax checks passed; lockfile installation succeeded. This is not live integration proof. |
 | Hosted Supabase migration/RLS/RPC and real CRUD verification in an isolated non-production project | 20% | 10% | 2% | Core/replay/outbox migrations and PGlite tests exist; no migration was applied to a persistent database and actual Preview project isolation is unconfirmed. |
 | Approved Client session → trusted BFF → signed Backend assertion | 20% | 0% | 0% | Contract documentation exists, but no approved Client/BFF repo/session source or verified deployed commit has been identified in the connected GitHub/Vercel inventory. |
 | Provider-verified guardian pairing, explicit consent, Official Account friend state and real LINE dispatcher | 15% | 5% | 0.75% | Design contract now documented; no pairing implementation, dispatcher, or live LINE delivery exists. Legacy recipient IDs are blocked. |
@@ -65,7 +65,7 @@ Therefore, **the ~30% figure applies only to the first safe Backend MVP**, not t
 1. The Candidate has a service-key + signed internal assertion + verified-principal + request-validation middleware chain. Missing trusted user identity fails closed; the BFF/session bridge is not implemented.
 2. Assertion replay protection and the durable termination outbox have embedded PostgreSQL-compatible regression tests.
 3. The outbox now **blocks** events and stores no recipient when the only evidence is a legacy `guardian_line_id`; the app adapter also rejects unsafe RPC responses.
-4. Latest CI HEAD `95db390` passed GitHub Actions run #349 with 90 tests and zero failures, `npm audit --audit-level=high` reporting 0 vulnerabilities, and six-file JavaScript syntax checks. The assertion verifier now rejects unknown payload claims before replay-store access.
+4. Latest Candidate HEAD `6f7c340` passed GitHub Actions run #355 with 90 tests and zero failures, `npm audit --audit-level=high` reporting 0 vulnerabilities, and six-file JavaScript syntax checks. The assertion verifier rejects unknown payload claims before replay-store access.
 5. Added [`docs/API_CONTRACT.md`](./API_CONTRACT.md) as a single Candidate API reference for liveness/readiness, authenticated route contracts, status codes, payload limits, CORS and the fact that app-termination status `blocked` records an event but does not send a LINE message. This is documentation work; it does not close live integration gates.
 5. Release-gate, outbox fail-closed, and guardian-pairing contracts are saved in this branch.
 
