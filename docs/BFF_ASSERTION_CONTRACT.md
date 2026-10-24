@@ -99,13 +99,18 @@ After resolving the user ID from the validated server-side session, the BFF can 
 
 ~~~javascript
 async function sendHeartbeatToBackend({ verifiedSessionUserId, grade }) {
+    const apiKey = process.env.LINC_API_KEY;
+    if (typeof apiKey !== 'string' || Buffer.byteLength(apiKey, 'utf8') < 32) {
+        throw new Error('Backend service authentication is not configured');
+    }
+
     const scope = '/api/v1/heartbeat';
     const assertion = issueInternalAssertion(verifiedSessionUserId, scope);
     const response = await fetch(process.env.LINC_BACKEND_URL + scope, {
         method: 'POST',
         headers: {
             'content-type': 'application/json',
-            'x-linc-api-key': process.env.LINC_API_KEY,
+            'x-linc-api-key': apiKey,
             'x-linc-user-assertion': assertion
         },
         body: JSON.stringify({ grade }),
