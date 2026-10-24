@@ -6,5 +6,10 @@
   ],
   "routes": [
     { "src": "/(.*)", "dest": "server.js" }
-  ]
+  ],
+  "git": {
+    "deploymentEnabled": {
+      "fix/linc-backend-clean-pr": false
+    }
+  }
 }
