@@ -26,6 +26,7 @@ test('aggregate data-quality checks do not select user identifiers', () => {
     const identifierSection = sql.split('-- 8)')[1]?.split('-- 9)')[0] || '';
     assert.match(duplicateSection, /count\(\*\) as duplicate_group_count/i);
     assert.match(duplicateSection, /to_jsonb\(u\)->>'user_id'/i);
+    assert.match(duplicateSection, /nullif\\(btrim\\(to_jsonb\\(u\\)->>'user_id'\\), ''\\) is not null/i);
     assert.doesNotMatch(duplicateSection, /select\s+(?:distinct\s+)?(?:u\.)?user_id\b/i);
     assert.match(identifierSection, /null_or_missing_user_id_count/i);
     assert.match(identifierSection, /blank_user_id_count/i);
