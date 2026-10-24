@@ -346,3 +346,21 @@ Exact Candidate code/test commit `e117545e7333d96f91f1881165290f37b7aa7c27` pass
 Boundary: this is an embedded PostgreSQL-compatible test, not a live Supabase test. It does not confirm hosted PostgREST routing, credentials, real project settings, or compatibility with the target project's existing grants/RLS. The migration remains unapplied to Supabase and to any persistent database. The Vercel environment metadata check is blocked by team-scope authorization; a one-time consent link has been generated and must be approved by a team member before we can retry a read-only metadata listing. No variable values were decrypted or modified.
 
 PR #2 remains Draft/unmerged and branch auto-deploy remains paused. Production remains on `main` SHA `336e2fcdd1b9f0841432817dcafe955b45700eef`, and the last direct GET probe at 09:04 UTC returned HTTP 500 from both `/health` and `/ready`. No Production changes, persistent database migrations/writes, secrets or live notifications were performed.
+
+
+## Latest read-only Vercel environment metadata + Production health — 2026-10-24 09:22 UTC (16:22 Thailand)
+
+Project environment metadata was successfully retrieved for the correct Vercel team/project with secret decryption disabled. Variable names and targets only:
+- `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `LINC_API_KEY`: Preview target only.
+- `LINE_CHANNEL_ACCESS_TOKEN`: Production and Preview.
+- `LINE_CHANNEL_SECRET`: Production only.
+- `LINC_INTERNAL_AUTH_SECRET`: absent from the returned inventory.
+- `LINC_ALLOWED_ORIGINS`: absent from the returned inventory.
+
+No values were decrypted, read, created, or changed. The Supabase URL was not read, so the actual project behind it and Preview-vs-Production DB isolation remain unverified. The Candidate's user-assertion middleware requires `LINC_INTERNAL_AUTH_SECRET` and would fail closed with HTTP 503 until this is configured for an approved Preview and the trusted BFF is wired. Do not add it to Production at this stage.
+
+Fresh GET-only Production probes at 09:22 UTC returned:
+- `GET /health`: HTTP 500 `FUNCTION_INVOCATION_FAILED`, request ID `sin1::vnrtl-1792833730755-752ce94541ad`.
+- `GET /ready`: HTTP 500 `FUNCTION_INVOCATION_FAILED`, request ID `sin1::2jmpn-1792833731860-95b962b160ed`.
+
+Active Production deployment remains `dpl_2ELeGpWoXTL6wFFvLEXxrLZzRgAk`, from `main` SHA `336e2fcdd1b9f0841432817dcafe955b45700eef`. No Production deployment or setting change, secret read, SQL, persistent database write, Preview SSO bypass, or LINE message occurred.
