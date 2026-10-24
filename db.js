@@ -27,6 +27,19 @@ function isDatabaseConfigured() {
     return !(process.env.VERCEL || process.env.VERCEL_ENV);
 }
 
+function assertCanonicalUserId(userId) {
+    if (
+        typeof userId !== 'string' ||
+        userId.length === 0 ||
+        userId.length > 200 ||
+        userId !== userId.trim() ||
+        /[\x00-\x1F\x7F]/.test(userId)
+    ) {
+        throw new TypeError('A valid userId is required');
+    }
+    return userId;
+}
+
 function assertDatabaseAvailable() {
     if (hasSupabaseConfig()) return;
     if (process.env.VERCEL || process.env.VERCEL_ENV) {
@@ -232,6 +245,7 @@ function encodePostgrestFilterValue(value) {
 }
 
 async function getUser(userId) {
+    assertCanonicalUserId(userId);
     assertDatabaseAvailable();
     if (!hasSupabaseConfig()) {
         const state = readLocalState();
@@ -260,9 +274,7 @@ async function getUser(userId) {
 }
 
 async function saveUser(user) {
-    if (!user || typeof user.userId !== 'string' || !user.userId.trim()) {
-        throw new TypeError('A valid userId is required');
-    }
+    assertCanonicalUserId(user && user.userId);
     assertDatabaseAvailable();
 
     if (!hasSupabaseConfig()) {
@@ -297,14 +309,7 @@ async function saveUser(user) {
 
 
 async function recordAppTermination(userId) {
-    if (
-        typeof userId !== 'string' ||
-        !userId.trim() ||
-        userId.length > 200
-    ) {
-        throw new TypeError('A valid userId is required');
-    }
-
+    assertCanonicalUserId(userId);
     assertDatabaseAvailable();
 
     if (hasSupabaseConfig()) {
