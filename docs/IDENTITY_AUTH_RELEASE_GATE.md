@@ -266,3 +266,13 @@ The latest read-only Production probe at 08:16 UTC returned HTTP 500 `FUNCTION_I
 - `GET /ready`: request ID `sin1::rqp4b-1792829801908-be8b37baa370`.
 
 These are GET-only availability checks. The Candidate remains Draft/unmerged; there was no Production deployment, environment mutation, secret decryption, SQL migration, database CRUD, Preview session bypass or real LINE delivery. The Client archive is still not confirmed as the approved deployed Client, so the bearer-session bridge remains an explicit release gate.
+
+
+
+## Backend BFF assertion verifier added — 2026-10-24
+
+Candidate PR #2 now includes `internal-assertion.js` and requires it in middleware order for all three protected `/api/v1/` routes: service API key → signed assertion → verified principal/body identity consistency → request validation → controller. The verifier accepts only a compact HS256 JWT with issuer `linc-client-bff`, audience `linc-backend`, a non-empty user subject, an expiry in the future and no more than 60 seconds after issue time, a jti format check, and a scope exactly matching the current POST route. A raw opaque bearer session token is not accepted as an internal assertion. If `LINC_INTERNAL_AUTH_SECRET` is unset/shorter than 32 bytes, the API remains fail-closed (503).
+
+The BFF signing example, required env vars and exact claims are documented in [docs/BFF_ASSERTION_CONTRACT.md](https://github.com/jaiioffice-svg/linc-tech-ex-backend/blob/fix/linc-backend-clean-pr/docs/BFF_ASSERTION_CONTRACT.md). The Client/BFF integration is **not yet implemented or confirmed as the approved deployed Client**. The legacy archive's opaque session must first be verified by its own trusted BFF using the authoritative session store; it must not be forwarded directly to the Backend. The current verifier validates the jti format but does not yet consume jti from a replay store; short TTL, HTTPS, no token logging and idempotent terminal alert handling mitigate the immediate risk but do not equal one-time replay prevention.
+
+App-delete handling was also made idempotent for an already-terminal `app_deleted` profile to avoid re-emitting the same alert event on duplicate requests. Real notification delivery still needs an outbox and provider integration.
