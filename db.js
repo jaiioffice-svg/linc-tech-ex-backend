@@ -294,26 +294,37 @@ async function saveUser(user) {
     assertSupportedUserStatus(user);
     assertDatabaseAvailable();
 
+    // Normalize the persisted representation once so the local adapter and
+    // Supabase/Postgres defaults cannot silently diverge.
+    const persistedUser = {
+        ...user,
+        grade: user.grade || 'M1',
+        guardianLineId: user.guardianLineId || null,
+        createdAt: user.createdAt || Date.now(),
+        lastHeartbeat: user.lastHeartbeat ?? null,
+        status: user.status === undefined ? 'active' : user.status
+    };
+
     if (!hasSupabaseConfig()) {
         const state = readLocalState();
-        Object.defineProperty(state.users, user.userId, {
+        Object.defineProperty(state.users, persistedUser.userId, {
             configurable: true,
             enumerable: true,
             writable: true,
-            value: user
+            value: persistedUser
         });
         writeLocalState(state);
         return user;
     }
 
     const row = {
-        user_id: user.userId,
-        grade: user.grade || 'M1',
-        guardian_line_id: user.guardianLineId || null,
-        created_at: user.createdAt || Date.now(),
-        last_heartbeat: user.lastHeartbeat ?? null,
-        status: user.status || 'active',
-        data: user,
+        user_id: persistedUser.userId,
+        grade: persistedUser.grade,
+        guardian_line_id: persistedUser.guardianLineId,
+        created_at: persistedUser.createdAt,
+        last_heartbeat: persistedUser.lastHeartbeat,
+        status: persistedUser.status,
+        data: persistedUser,
         updated_at: new Date().toISOString()
     };
     await supabaseRequest(`${SUPABASE_TABLE}?on_conflict=user_id`, {
