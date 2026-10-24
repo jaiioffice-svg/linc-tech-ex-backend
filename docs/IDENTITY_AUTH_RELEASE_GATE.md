@@ -135,6 +135,11 @@ Do **not** make a one-line Production edit, promote the current candidate automa
 
 No Production code, alias, environment variable, secret, database row, migration, or notification setting was changed during this recheck.
 
+## Current Preview access boundary — rechecked 2026-10-24 07:10 UTC
+- Read-only requests to the latest available guarded Preview URL (`linc-tech-ex-backend-6ie0reaqe-linc8.vercel.app`) for both `/health` and `/ready` received HTTP **302** redirects to Vercel SSO before reaching Express.
+- These responses establish only that Vercel deployment protection is active; they are **not** application health/readiness results. No HTTP 200/503 application outcome is claimed from this recheck.
+- I did not create a shareable/bypass URL, change SSO protection, or send POST requests. Use an authorized Vercel CLI/MCP path or an explicitly authorized test window to perform the next Preview app-level checks without broadening access to the deployment.
+
 ## Recommended next path — one candidate, staged verification
 
 Decision as of 2026-10-24: continue with Draft PR #2 (`fix/linc-backend-clean-pr`) as the single Backend release candidate; do not start another overlapping Runtime branch. PR #3 documents the earlier serverless-persistence change, but its route contract does not include the fail-closed verified-end-user gate now present in PR #2.
