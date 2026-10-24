@@ -138,12 +138,16 @@ function isSupabaseUrlAllowed() {
 const DATABASE_REQUEST_TIMEOUT_MS = 8000;
 
 function buildSupabaseHeaders(serviceKey, extensionHeaders = {}) {
-    // Only allow non-credential extension headers (for example PostgREST's
-    // Prefer header) from internal callers. Header names are case-insensitive.
+    // PostgREST's Prefer header is the only extension currently required by
+    // internal call sites. Keep all other caller-controlled headers out.
     const extraHeaders = {};
     for (const [name, value] of Object.entries(extensionHeaders || {})) {
-        if (!['apikey', 'authorization', 'content-type'].includes(name.toLowerCase())) {
-            extraHeaders[name] = value;
+        if (
+            name.toLowerCase() === 'prefer' &&
+            typeof value === 'string' &&
+            !/[\x00-\x1F\x7F]/.test(value)
+        ) {
+            extraHeaders.Prefer = value;
         }
     }
 
