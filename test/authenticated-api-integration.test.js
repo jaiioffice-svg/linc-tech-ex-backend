@@ -31,18 +31,18 @@ const app = require('../server');
 const server = http.createServer(app);
 const nativeFetch = global.fetch;
 
-function createAssertion() {
+function createAssertion({ scope = '/api/v1/users/register', sub = USER_ID, jti = 'test-assertion-id-000001' } = {}) {
     const now = Math.floor(Date.now() / 1000);
     const header = Buffer.from(JSON.stringify({ alg: 'HS256', typ: 'JWT' }))
         .toString('base64url');
     const claims = Buffer.from(JSON.stringify({
         iss: 'linc-client-bff',
         aud: 'linc-backend',
-        sub: USER_ID,
+        sub,
         iat: now,
         exp: now + 30,
-        jti: 'test-assertion-id-000001',
-        scope: '/api/v1/users/register'
+        jti,
+        scope
     })).toString('base64url');
     const signingInput = `${header}.${claims}`;
     const signature = crypto.createHmac('sha256', INTERNAL_SECRET)
@@ -161,5 +161,87 @@ test('authenticated registration API integration with isolated Supabase boundary
     assert.equal(typeof calls[2].body.updated_at, 'string');
     assert.equal(calls[2].headers.apikey, 'sb_secret_test-only-key');
     assert.equal(calls[2].headers.Authorization, undefined);
+
+    await t.test('invalid service key is rejected before any Supabase call', async () => {
+        const before = calls.length;
+        const denied = await nativeFetch(`${baseUrl}/api/v1/users/register`, {
+            method: 'POST',
+            headers: {
+                'content-type': 'application/json',
+                'x-linc-api-key': `${API_KEY}-wrong`,
+                'x-linc-user-assertion': createAssertion({ jti: 'test-assertion-id-000002' })
+            },
+            body: JSON.stringify({ userId: USER_ID, grade: 'M1' })
+        });
+        assert.equal(denied.status, 401);
+        assert.deepEqual(await denied.json(), {
+            success: false,
+            message: 'Unauthorized connection'
+        });
+        assert.equal(calls.length, before);
+    });
+
+    await t.test('tampered assertion signature is rejected before any Supabase call', async () => {
+        const before = calls.length;
+        const assertion = createAssertion({ jti: 'test-assertion-id-000003' });
+        const parts = assertion.split('.');
+        parts[2] = (parts[2][0] === 'A' ? 'B' : 'A') + parts[2].slice(1);
+        const denied = await nativeFetch(`${baseUrl}/api/v1/users/register`, {
+            method: 'POST',
+            headers: {
+                'content-type': 'application/json',
+                'x-linc-api-key': API_KEY,
+                'x-linc-user-assertion': parts.join('.')
+            },
+            body: JSON.stringify({ userId: USER_ID, grade: 'M1' })
+        });
+        assert.equal(denied.status, 401);
+        assert.deepEqual(await denied.json(), {
+            success: false,
+            message: 'Unauthorized connection'
+        });
+        assert.equal(calls.length, before);
+    });
+
+    await t.test('route-scope mismatch is rejected before replay storage is consulted', async () => {
+        const before = calls.length;
+        const denied = await nativeFetch(`${baseUrl}/api/v1/users/register`, {
+            method: 'POST',
+            headers: {
+                'content-type': 'application/json',
+                'x-linc-api-key': API_KEY,
+                'x-linc-user-assertion': createAssertion({
+                    scope: '/api/v1/heartbeat',
+                    jti: 'test-assertion-id-000004'
+                })
+            },
+            body: JSON.stringify({ userId: USER_ID, grade: 'M1' })
+        });
+        assert.equal(denied.status, 401);
+        assert.deepEqual(await denied.json(), {
+            success: false,
+            message: 'Unauthorized connection'
+        });
+        assert.equal(calls.length, before);
+    });
+
+    await t.test('cross-account body identity mismatch is rejected before replay storage or profile access', async () => {
+        const before = calls.length;
+        const denied = await nativeFetch(`${baseUrl}/api/v1/users/register`, {
+            method: 'POST',
+            headers: {
+                'content-type': 'application/json',
+                'x-linc-api-key': API_KEY,
+                'x-linc-user-assertion': createAssertion({ jti: 'test-assertion-id-000005' })
+            },
+            body: JSON.stringify({ userId: 'another-account', grade: 'M1' })
+        });
+        assert.equal(denied.status, 403);
+        assert.deepEqual(await denied.json(), {
+            success: false,
+            message: 'Requested user does not match authenticated identity'
+        });
+        assert.equal(calls.length, before);
+    });
 });
 
