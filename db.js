@@ -110,7 +110,9 @@ function normalizeSupabaseUser(row) {
         guardianLineId: row.guardian_line_id !== undefined ? row.guardian_line_id : (data.guardianLineId ?? null),
         createdAt: row.created_at ?? data.createdAt,
         lastHeartbeat: row.last_heartbeat ?? data.lastHeartbeat ?? null,
-        status: row.status || data.status
+        status: row.status === 'app_deleted' || data.status === 'app_deleted'
+            ? 'app_deleted'
+            : (row.status || data.status)
     };
 }
 
