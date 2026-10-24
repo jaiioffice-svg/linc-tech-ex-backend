@@ -310,7 +310,7 @@ test('authenticated registration API integration with isolated Supabase boundary
             message: 'Request contains an unsupported field'
         });
         assert.equal(calls.length - before, 1);
-        assert.match(calls[before].path, /\\/rpc\\/linc_consume_auth_assertion$/);
+        assert.equal(calls[before].path.endsWith('/rpc/linc_consume_auth_assertion'), true);
         assert.equal(calls.some(call => call.path.endsWith('/rpc/linc_record_app_termination')), false);
     });
 
@@ -338,8 +338,8 @@ test('authenticated registration API integration with isolated Supabase boundary
 
         const newCalls = calls.slice(before);
         assert.equal(newCalls.length, 2);
-        assert.match(newCalls[0].path, /\\/rpc\\/linc_consume_auth_assertion$/);
-        assert.match(newCalls[1].path, /\\/rpc\\/linc_record_app_termination$/);
+        assert.equal(newCalls[0].path.endsWith('/rpc/linc_consume_auth_assertion'), true);
+        assert.equal(newCalls[1].path.endsWith('/rpc/linc_record_app_termination'), true);
         assert.deepEqual(newCalls[1].body, { p_user_id: USER_ID });
         assert.equal(newCalls.every(call => call.path.includes('/rpc/linc_')), true);
     });
