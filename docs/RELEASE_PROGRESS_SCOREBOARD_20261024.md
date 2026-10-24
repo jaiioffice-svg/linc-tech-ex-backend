@@ -33,6 +33,19 @@ The weighting is an explicit planning estimate for the **first safe end-to-end B
 
 These numbers should be updated only when a gate is supported by observable evidence. They are intentionally estimates; they are not a statistical measurement and do not imply the UI/client is 30% finished. The current Production availability is separately **0% healthy** based on the latest observed 500 responses.
 
+## Important scope correction — the full Client app is not covered by the 30% Backend estimate
+
+The Library artifact `Linc_Updated_Source_for_Online_Testing.zip` was inspected as a **reference archive only**. It is not present in the connected GitHub repository inventory and has not been confirmed as the approved or deployed Client source. Its own README calls the build a development scaffold, not a production-ready app.
+
+Review observations in that archive (not proof of current deployed behavior):
+- It is a React/Vite/Express app with a local JSON store (`data/linc_store.json`) and its opaque session hashes stored in that same JSON-backed in-process state. This does not demonstrate durable shared session storage across serverless instances.
+- `POST /api/guardian/confirm` accepts `lineUserId` from the request body and then records it as a guardian; the examined route validates the QR pairing token, but does not itself verify a LINE Login ID token with LINE.
+- `POST /api/user/setup` substitutes a placeholder guardian ID (`line_guardian_linc`) when none is supplied and sets `guardianLinePairedAt` at profile creation. That must not be treated as verified guardian pairing.
+- The archive's `src/services/api.ts` sends an opaque `localStorage` session token to same-origin `/api/*` endpoints. The archive does not demonstrate a BFF connection to this Backend's `/api/v1/*` routes.
+- Its README documents payment/restore and device-heartbeat endpoints as deliberately returning HTTP 501 until trusted providers/device authentication are implemented. The inspected archive is not a native Android/iOS project and does not prove OS-level VPN/site filtering is implemented.
+
+Therefore, **the ~30% figure applies only to the first safe Backend MVP**, not the full L!nc product, Client UI, native protection, payment or live LINE delivery. A reliable full-product percentage cannot be assigned until the approved Client repository/release and the MVP scope are confirmed. The full product is not ready for real users now.
+
 ## Done and evidenced
 
 1. The Candidate has a service-key + signed internal assertion + verified-principal + request-validation middleware chain. Missing trusted user identity fails closed; the BFF/session bridge is not implemented.
