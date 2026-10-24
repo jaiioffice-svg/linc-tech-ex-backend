@@ -1,6 +1,8 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
+const os = require('node:os');
+const path = require('node:path');
 
 const dbPath = require.resolve('../db');
 
@@ -549,6 +551,51 @@ test('saveUser persists a profile using a Supabase upsert', async () => {
         });
     } finally {
         global.fetch = originalFetch;
+    }
+});
+
+test('local JSON adapter persists the same normalized defaults as Supabase', async () => {
+    const originalModule = require.cache[dbPath];
+    const envKeys = [
+        'LINC_DATA_FILE',
+        'SUPABASE_URL',
+        'SUPABASE_SERVICE_ROLE_KEY',
+        'VERCEL',
+        'VERCEL_ENV'
+    ];
+    const originalEnv = Object.fromEntries(envKeys.map(key => [key, process.env[key]]));
+    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'linc-local-defaults-'));
+    const tempFile = path.join(tempDir, 'linc_data.json');
+
+    try {
+        process.env.LINC_DATA_FILE = tempFile;
+        delete process.env.SUPABASE_URL;
+        delete process.env.SUPABASE_SERVICE_ROLE_KEY;
+        delete process.env.VERCEL;
+        delete process.env.VERCEL_ENV;
+        delete require.cache[dbPath];
+
+        const localDb = require('../db');
+        const input = { userId: 'local-defaults-user' };
+        assert.equal(await localDb.saveUser(input), input);
+
+        const persisted = JSON.parse(fs.readFileSync(tempFile, 'utf8'));
+        const user = persisted.users['local-defaults-user'];
+        assert.equal(user.userId, 'local-defaults-user');
+        assert.equal(user.grade, 'M1');
+        assert.equal(user.status, 'active');
+        assert.equal(user.guardianLineId, null);
+        assert.equal(user.lastHeartbeat, null);
+        assert.equal(Number.isSafeInteger(user.createdAt), true);
+        assert.equal(persisted.outbox.length, 0);
+    } finally {
+        delete require.cache[dbPath];
+        if (originalModule) require.cache[dbPath] = originalModule;
+        for (const [key, value] of Object.entries(originalEnv)) {
+            if (value === undefined) delete process.env[key];
+            else process.env[key] = value;
+        }
+        fs.rmSync(tempDir, { recursive: true, force: true });
     }
 });
 
