@@ -17,7 +17,8 @@ async function applyMigrations(database) {
         '20261022_003_defer_heartbeat.sql',
         '20261023_004_repair_service_role_grants.sql',
         '20261024_003_auth_assertion_replay.sql',
-        '20261024_004_notification_outbox.sql'
+        '20261024_004_notification_outbox.sql',
+        '20261024_005_outbox_fail_closed_default.sql'
     ]) {
         const fullPath = path.join(__dirname, '..', 'supabase', 'migrations', filename);
         await database.exec(fs.readFileSync(fullPath, 'utf8'));
@@ -110,6 +111,56 @@ test('outbox records a blocked event when a guardian is not linked and does not 
         assert.equal(row.rows.length, 1);
         assert.equal(row.rows[0].recipient_line_id, null);
         assert.equal(row.rows[0].event_status, 'blocked');
+    } finally {
+        await database.close();
+    }
+});
+
+
+test('outbox defaults to blocked and database constraints prevent status-recipient contradictions', async () => {
+    const database = new PGlite();
+
+    try {
+        await applyMigrations(database);
+        await seedUser(database, 'constraint-user', null);
+
+        await database.query(
+            "INSERT INTO public.linc_notification_outbox (user_id, event_type) VALUES ($1, 'APP_TERMINATION_SIGNAL')",
+            ['constraint-user']
+        );
+        const defaulted = await database.query(
+            'SELECT recipient_line_id, event_status FROM public.linc_notification_outbox WHERE user_id = $1',
+            ['constraint-user']
+        );
+        assert.equal(defaulted.rows[0].event_status, 'blocked');
+        assert.equal(defaulted.rows[0].recipient_line_id, null);
+
+        await assert.rejects(
+            database.query(
+                "INSERT INTO public.linc_notification_outbox (user_id, event_type, event_status, recipient_line_id) VALUES ($1, 'APP_TERMINATION_SIGNAL', 'pending', NULL)",
+                ['constraint-user']
+            ),
+            error => error && error.code === '23514'
+        );
+
+        await assert.rejects(
+            database.query(
+                "INSERT INTO public.linc_notification_outbox (user_id, event_type, event_status, recipient_line_id) VALUES ($1, 'APP_TERMINATION_SIGNAL', 'blocked', 'unverified-line-id')",
+                ['constraint-user']
+            ),
+            error => error && error.code === '23514'
+        );
+
+        await database.query(
+            "INSERT INTO public.linc_notification_outbox (user_id, event_type, event_status, recipient_line_id) VALUES ($1, 'APP_TERMINATION_SIGNAL', 'pending', 'verified-test-recipient')",
+            ['constraint-user']
+        );
+        const validPending = await database.query(
+            "SELECT event_status, recipient_line_id FROM public.linc_notification_outbox WHERE user_id = $1 AND event_status = 'pending'",
+            ['constraint-user']
+        );
+        assert.equal(validPending.rows.length, 1);
+        assert.equal(validPending.rows[0].recipient_line_id, 'verified-test-recipient');
     } finally {
         await database.close();
     }
