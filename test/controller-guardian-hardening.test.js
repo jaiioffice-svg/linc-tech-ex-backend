@@ -117,8 +117,55 @@ test('immediate-delete alert uses the authenticated profile and stored guardian 
     }, res, payload => { alertPayload = payload; });
 
     assert.equal(res.statusCode, 200);
-    assert.equal(alertPayload.guardianLineId, 'verified-stored-line-id');
-    assert.equal(readState().users['delete-user'].status, 'app_deleted');
+    assert.equal(alertPayload.guardianLinked, true);
+    assert.equal(alertPayload.eventStatus, 'pending');
+    assert.ok(alertPayload.eventId);
+    assert.equal(
+        JSON.stringify(alertPayload).includes('verified-stored-line-id'),
+        false,
+        'the log callback must not receive the raw guardian LINE ID'
+    );
+
+    const state = readState();
+    assert.equal(state.users['delete-user'].status, 'app_deleted');
+    assert.equal(state.outbox.length, 1);
+    assert.equal(state.outbox[0].recipientLineId, 'verified-stored-line-id');
+    assert.equal(state.outbox[0].eventType, 'APP_TERMINATION_SIGNAL');
+    assert.equal(state.outbox[0].eventStatus, 'pending');
+    assert.equal(state.outbox[0].payload.reason, 'APP_TERMINATION_SIGNAL');
+});
+
+
+test('app termination records a blocked outbox event when no guardian is linked', async () => {
+    fs.writeFileSync(process.env.LINC_DATA_FILE, JSON.stringify({
+        schools: {},
+        users: {
+            'unlinked-delete-user': {
+                userId: 'unlinked-delete-user',
+                grade: 'M1',
+                guardianLineId: null,
+                createdAt: Date.now(),
+                status: 'active'
+            }
+        },
+        revenue: { total: 0 }
+    }));
+
+    const res = mockResponse();
+    let callbackPayload;
+    await require('../controllers').handleImmediateDelete({
+        auth: { userId: 'unlinked-delete-user' },
+        body: { userId: 'unlinked-delete-user' }
+    }, res, payload => { callbackPayload = payload; });
+
+    const state = readState();
+    assert.equal(res.statusCode, 200);
+    assert.equal(res.body.notificationStatus, 'blocked');
+    assert.equal(callbackPayload.guardianLinked, false);
+    assert.equal(state.outbox.length, 1);
+    assert.equal(state.outbox[0].eventStatus, 'blocked');
+    assert.equal(state.outbox[0].recipientLineId, null);
+    assert.equal(state.users['unlinked-delete-user'].status, 'app_deleted');
 });
 
 test('repeated app-delete requests do not re-record or re-emit the same terminal event', async () => {
@@ -167,6 +214,11 @@ test('repeated app-delete requests do not re-record or re-emit the same terminal
     assert.equal(secondResponse.body.alreadyRecorded, true);
     assert.equal(secondState.deletedAt, firstDeletedAt);
     assert.equal(alertCount, 1);
+    assert.equal(
+        readState().outbox.length,
+        1,
+        'repeated deletion must not create a duplicate outbox event'
+    );
 });
 
 test('heartbeat cannot reactivate a profile marked app_deleted', async () => {
