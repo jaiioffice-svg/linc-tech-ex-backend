@@ -1,3 +1,10 @@
+const DEFAULT_ALLOWED_FIELDS = new Set(['userId', 'grade']);
+const ALLOWED_FIELDS_BY_PATH = {
+    '/api/v1/users/register': DEFAULT_ALLOWED_FIELDS,
+    '/api/v1/heartbeat': DEFAULT_ALLOWED_FIELDS,
+    '/api/v1/alert/delete': new Set(['userId'])
+};
+
 function invalidRequest(res, code, message) {
     return res.status(400).json({
         success: false,
@@ -17,7 +24,7 @@ function validateUserRequest(req, res, next) {
         );
     }
 
-    const allowedFields = new Set(['userId', 'grade']);
+    const allowedFields = ALLOWED_FIELDS_BY_PATH[req.path] || DEFAULT_ALLOWED_FIELDS;
     const unsupportedField = Object.keys(body).find(key => !allowedFields.has(key));
     if (unsupportedField !== undefined) {
         return invalidRequest(
