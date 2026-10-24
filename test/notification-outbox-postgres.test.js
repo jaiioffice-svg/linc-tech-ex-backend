@@ -211,6 +211,66 @@ test('termination RPC rejects blank, padded, and oversized user IDs', async () =
     }
 });
 
+
+test('fail-closed outbox migration safely upgrades legacy pending events without recipients', async () => {
+    const database = new PGlite();
+
+    try {
+        await applyMigrations(database);
+        await seedUser(database, 'legacy-outbox-user', 'legacy-line-id');
+
+        // Simulate a previously installed schema that predates the new
+        // recipient/status constraint and still defaults omitted status to pending.
+        await database.exec(`
+            ALTER TABLE public.linc_notification_outbox
+                DROP CONSTRAINT linc_notification_outbox_recipient_status_check;
+            ALTER TABLE public.linc_notification_outbox
+                ALTER COLUMN event_status SET DEFAULT 'pending';
+        `);
+        await database.query(
+            "INSERT INTO public.linc_notification_outbox (user_id, event_type, event_status, recipient_line_id) VALUES ($1, 'APP_TERMINATION_SIGNAL', 'pending', NULL)",
+            ['legacy-outbox-user']
+        );
+        await database.query(
+            "INSERT INTO public.linc_notification_outbox (user_id, event_type, event_status, recipient_line_id) VALUES ($1, 'APP_TERMINATION_SIGNAL', 'blocked', 'legacy-line-id')",
+            ['legacy-outbox-user']
+        );
+
+        const migration = fs.readFileSync(
+            path.join(__dirname, '..', 'supabase', 'migrations', '20261024_005_outbox_fail_closed_default.sql'),
+            'utf8'
+        );
+        await database.exec(migration);
+        // Re-running is safe and proves the constraint/default migration is idempotent.
+        await database.exec(migration);
+
+        const rows = await database.query(
+            'SELECT event_status, recipient_line_id FROM public.linc_notification_outbox WHERE user_id = $1 ORDER BY created_at, event_id',
+            ['legacy-outbox-user']
+        );
+        assert.equal(rows.rows.length, 2);
+        for (const row of rows.rows) {
+            assert.equal(row.event_status, 'blocked');
+            assert.equal(row.recipient_line_id, null);
+        }
+
+        const metadata = await database.query(
+            "SELECT column_default FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'linc_notification_outbox' AND column_name = 'event_status'"
+        );
+        assert.match(metadata.rows[0].column_default, /blocked/);
+
+        await assert.rejects(
+            database.query(
+                "INSERT INTO public.linc_notification_outbox (user_id, event_type, event_status, recipient_line_id) VALUES ($1, 'APP_TERMINATION_SIGNAL', 'pending', NULL)",
+                ['legacy-outbox-user']
+            ),
+            error => error && error.code === '23514'
+        );
+    } finally {
+        await database.close();
+    }
+});
+
 test('outbox insert failure rolls back the app_deleted status change', async () => {
     const database = new PGlite();
 
