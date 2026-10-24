@@ -223,3 +223,13 @@ Candidate PR #2 now has a centralized final Express error middleware and stable 
 Response payloads do not expose stack traces, upstream messages or raw submitted body content. Logging is limited to method, status and normalized error codes. Regression tests are in `test/error-handling.test.js`. On exact Runtime/test commit `b1938566584f7ad42e732cb7d6916937ec980bda`, isolated Sandbox checks passed **41/41 tests**, `npm audit` found 0 vulnerabilities, Vercel scope/config checks and `git diff --check` passed; GitHub Actions [run #149](https://github.com/jaiioffice-svg/linc-tech-ex-backend/actions/runs/40076554069) succeeded.
 
 This hardening does not implement the missing end-user token verifier and does not change the state of the deployed function. Latest read-only Production GETs at 07:47 UTC (14:47 Thailand) still showed HTTP 500 for both `/health` and `/ready`. Keep Candidate Draft/unmerged; no deployment, migration, database CRUD, secret read or Production configuration change occurred.
+
+
+
+## Candidate database timeout + request error boundary hardening — 2026-10-24
+
+The Candidate now applies an 8-second AbortSignal timeout to Supabase REST requests and normalizes network, timeout and malformed-success-response failures to a generic `DB_UNAVAILABLE` error. This prevents request waits from being unbounded and avoids leaking raw upstream parse errors. No database credentials or live Supabase endpoint were used in these tests.
+
+Latest Runtime/test commit `e9eb8f10d9704684fd26dc66910a2fb2fa244942` passed **43/43 tests** in an isolated Vercel Sandbox; `npm audit` reported 0 vulnerabilities; `node --check server.js`, `node --check db.js`, Vercel config/scope validation and `git diff --check` passed. GitHub Actions [run #157](https://github.com/jaiioffice-svg/linc-tech-ex-backend/actions/runs/40076735927) succeeded. Additional tests cover sanitized malformed-JSON 400, oversize-payload 413, unknown-route 404, Supabase transport timeout normalization, and invalid upstream JSON normalization.
+
+These are local/Sandbox regressions only. They do not prove real Preview Supabase connectivity or user-session authentication. Production was last read-only checked at 07:47 UTC (14:47 Thai time) and still returned HTTP 500 `FUNCTION_INVOCATION_FAILED` on `/health` and `/ready`. Keep the Candidate Draft/unmerged and the review branch deployment pause in place. No Production deployment, SQL, CRUD, environment changes, secrets decryption, or live notifications were performed.
