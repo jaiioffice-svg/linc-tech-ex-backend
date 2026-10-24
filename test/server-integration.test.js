@@ -67,12 +67,18 @@ test('HTTP server integration contracts', async t => {
     await t.test('malformed JSON receives the stable INVALID_JSON contract', async () => {
         const response = await fetch(`${baseUrl}/api/v1/heartbeat`, {
             method: 'POST',
-            headers: { 'content-type': 'application/json' },
+            headers: {
+                'content-type': 'application/json',
+                origin: 'https://app.example.test'
+            },
             body: '{"userId":'
         });
         const body = await response.json();
 
         assert.equal(response.status, 400);
+        assert.equal(response.headers.get('x-content-type-options'), 'nosniff');
+        assert.equal(response.headers.get('x-frame-options'), 'SAMEORIGIN');
+        assert.equal(response.headers.get('access-control-allow-origin'), 'https://app.example.test');
         assert.deepEqual(body, {
             success: false,
             code: 'INVALID_JSON',
@@ -83,12 +89,18 @@ test('HTTP server integration contracts', async t => {
     await t.test('oversized request bodies are rejected before route handlers', async () => {
         const response = await fetch(`${baseUrl}/api/v1/heartbeat`, {
             method: 'POST',
-            headers: { 'content-type': 'application/json' },
+            headers: {
+                'content-type': 'application/json',
+                origin: 'https://app.example.test'
+            },
             body: JSON.stringify({ payload: 'x'.repeat(70 * 1024) })
         });
         const body = await response.json();
 
         assert.equal(response.status, 413);
+        assert.equal(response.headers.get('x-content-type-options'), 'nosniff');
+        assert.equal(response.headers.get('x-frame-options'), 'SAMEORIGIN');
+        assert.equal(response.headers.get('access-control-allow-origin'), 'https://app.example.test');
         assert.deepEqual(body, {
             success: false,
             code: 'REQUEST_TOO_LARGE',
