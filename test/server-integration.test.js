@@ -118,6 +118,35 @@ test('HTTP server integration contracts', async t => {
         assert.equal(response.headers.get('x-powered-by'), null);
     });
 
+
+    await t.test('CORS preflight supports the protected BFF request headers only for an allowed origin', async () => {
+        const preflightHeaders = {
+            origin: 'https://app.example.test',
+            'access-control-request-method': 'POST',
+            'access-control-request-headers': 'content-type,x-linc-api-key,x-linc-user-assertion'
+        };
+        const allowed = await fetch(`${baseUrl}/api/v1/heartbeat`, {
+            method: 'OPTIONS',
+            headers: preflightHeaders
+        });
+        const denied = await fetch(`${baseUrl}/api/v1/heartbeat`, {
+            method: 'OPTIONS',
+            headers: {
+                ...preflightHeaders,
+                origin: 'https://untrusted.example.test'
+            }
+        });
+
+        assert.equal(allowed.status, 204);
+        assert.equal(allowed.headers.get('access-control-allow-origin'), 'https://app.example.test');
+        assert.equal(allowed.headers.get('access-control-allow-methods').includes('POST'), true);
+        const allowedHeaders = allowed.headers.get('access-control-allow-headers') || '';
+        for (const header of ['content-type', 'x-linc-api-key', 'x-linc-user-assertion']) {
+            assert.equal(allowedHeaders.toLowerCase().includes(header), true);
+        }
+        assert.equal(denied.headers.get('access-control-allow-origin'), null);
+    });
+
     await t.test('CORS allows only explicitly configured origins', async () => {
         const allowed = await fetch(`${baseUrl}/health`, {
             headers: { origin: 'https://app.example.test' }
