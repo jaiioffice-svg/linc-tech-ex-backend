@@ -108,6 +108,16 @@ test('HTTP server integration contracts', async t => {
         });
     });
 
+
+    await t.test('security headers are present and Express fingerprinting is absent', async () => {
+        const response = await fetch(`${baseUrl}/health`);
+
+        assert.equal(response.headers.get('x-content-type-options'), 'nosniff');
+        assert.equal(response.headers.get('x-frame-options'), 'SAMEORIGIN');
+        assert.equal(response.headers.get('referrer-policy'), 'no-referrer');
+        assert.equal(response.headers.get('x-powered-by'), null);
+    });
+
     await t.test('CORS allows only explicitly configured origins', async () => {
         const allowed = await fetch(`${baseUrl}/health`, {
             headers: { origin: 'https://app.example.test' }
