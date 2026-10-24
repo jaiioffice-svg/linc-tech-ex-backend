@@ -176,6 +176,41 @@ test('invalid successful response JSON is normalized as a database-unavailable e
     }
 });
 
+test('getUser rejects a successful response with the wrong JSON shape as DB_UNAVAILABLE', async () => {
+    const db = require('../db');
+    const originalFetch = global.fetch;
+
+    global.fetch = async () => new Response(
+        JSON.stringify({ user_id: 'unexpected-object' }),
+        { status: 200, headers: { 'content-type': 'application/json' } }
+    );
+
+    try {
+        await withEnv({
+            VERCEL: '1',
+            VERCEL_ENV: 'preview',
+            SUPABASE_URL: 'https://example-project.supabase.co',
+            SUPABASE_SERVICE_ROLE_KEY: 'sb_secret_test_only'
+        }, async () => {
+            await assert.rejects(
+                db.getUser('shape-user'),
+                error => {
+                    assert.equal(error.code, 'DB_UNAVAILABLE');
+                    assert.equal(
+                        error.message,
+                        'Database response has an unexpected shape'
+                    );
+                    return true;
+                }
+            );
+
+            assert.equal(await db.checkDatabaseConnection(), false);
+        });
+    } finally {
+        global.fetch = originalFetch;
+    }
+});
+
 test('saveUser persists a profile using a Supabase upsert', async () => {
     const db = require('../db');
     const originalFetch = global.fetch;
