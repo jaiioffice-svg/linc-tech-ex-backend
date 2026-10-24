@@ -16,7 +16,7 @@ This document describes the current L!nc Backend Candidate and the intended appl
 
 The current Backend repository is intentionally kept in its existing flat layout while recovery is underway.
 
-- api/index.js — Vercel entry adapter; keep its routing behavior covered by tests.
+- api/[...path].js — Vercel catch-all entry adapter; keep its routing behavior covered by tests.
 - auth.js — shared-service-key gate and fail-closed verified-user gate.
 - controllers.js — registration, heartbeat, and delete-alert handlers.
 - db.js — Supabase REST adapter; local JSON persistence is restricted to local development.
