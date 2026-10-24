@@ -3,6 +3,7 @@ const cors = require('cors');
 const helmet = require('helmet');
 const { notFoundHandler, errorHandler } = require('./error-handler');
 const { validateUserRequest } = require('./request-validation');
+const { authenticateInternalAssertion } = require('./internal-assertion');
 const {
     handleUserRegistration,
     handleHeartbeat,
@@ -60,6 +61,7 @@ function sendEmergencySignal(alertPayload) {
 app.post(
     '/api/v1/heartbeat',
     validateApiKey,
+    authenticateInternalAssertion,
     requireVerifiedEndUser,
     validateUserRequest,
     handleHeartbeat
