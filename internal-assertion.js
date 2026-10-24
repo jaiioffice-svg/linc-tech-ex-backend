@@ -116,6 +116,7 @@ function createInternalAssertionMiddleware({ consumeAssertionId = consumeInterna
             claims.aud !== EXPECTED_AUDIENCE ||
             typeof claims.sub !== 'string' ||
             !claims.sub.trim() ||
+            claims.sub !== claims.sub.trim() ||
             claims.sub.length > 200 ||
             !Number.isSafeInteger(claims.iat) ||
             !Number.isSafeInteger(claims.exp) ||
