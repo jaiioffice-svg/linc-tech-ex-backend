@@ -24,6 +24,16 @@ This is a review sequence, **not permission to run the scripts**:
 
 Do not run a step just because a previous step succeeded. If the live schema already differs from these assumptions, stop and prepare a schema-specific migration instead.
 
+## Relationship to Candidate PR #2 — do not mix migration contracts
+
+This folder is on Draft PR #21's separate review branch. Its base migration `20261024_linc_users_backend.sql` is paired with that branch's `db.js`, which differs from Candidate PR #2's repository layer. In particular, the PR #21 base migration does **not** define the `data jsonb` column used by PR #2's `db.js`; Candidate PR #2's base migration `20261022_002_linc_core.sql` does define it.
+
+Accordingly:
+
+- Do not apply PR #21's migration bundle as a way to provision Candidate PR #2's database.
+- The read-only preflight may help inspect an already identified non-production project, but its result must be reconciled against Candidate PR #2's actual schema contract.
+- Any schema changes, timestamp conversions or grants require a new reviewed plan against the actual schema and a known non-production project. No SQL is authorized by this README, and no SQL is automatically applied by GitHub/Vercel.
+
 ## Security boundary
 
 The Supabase service-role credential is server-only and remains highly privileged. Restricting table grants does **not** solve end-user authentication or owner isolation. The backend's shared API key is not proof of the end user's identity; do not treat this grant change as production security sign-off.

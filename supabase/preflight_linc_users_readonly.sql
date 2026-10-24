@@ -1,7 +1,13 @@
 -- L!nc Supabase preflight: READ-ONLY checks before applying
 -- supabase/migrations/20261024_linc_users_backend.sql
 -- Run this file in Supabase SQL Editor and inspect each result.
+-- IMPORTANT: DO NOT execute this whole file at once on an unknown database.
+-- First select and execute ONLY the query in section 1.
+-- If section 1 returns zero rows, STOP; do not execute sections 2-9.
+-- If section 1 confirms the table exists, then select and execute sections 2-9.
+-- Do not apply a migration until the schema and ownership/authorization plan are reviewed.
 -- This file intentionally performs no INSERT, UPDATE, DELETE, ALTER, or CREATE.
+-- Privacy: duplicate checks return aggregate counts only, never user identifiers.
 
 -- 1) Confirm whether public.linc_users exists and inspect its columns/types/defaults.
 select
@@ -38,32 +44,60 @@ where schemaname = 'public'
   and tablename = 'linc_users'
 order by indexname;
 
--- 4) Count existing rows (does not expose row contents).
+-- 4) Inspect whether row-level security is enabled/forced on the table.
+select
+  n.nspname as schema_name,
+  c.relname as table_name,
+  c.relrowsecurity as rls_enabled,
+  c.relforcerowsecurity as rls_forced
+from pg_class c
+join pg_namespace n on n.oid = c.relnamespace
+where n.nspname = 'public'
+  and c.relname = 'linc_users'
+  and c.relkind in ('r', 'p');
+
+-- 5) Inspect explicit table grants; this is read-only and does not change privileges.
+select
+  grantee,
+  privilege_type,
+  is_grantable
+from information_schema.role_table_grants
+where table_schema = 'public'
+  and table_name = 'linc_users'
+order by grantee, privilege_type;
+
+-- 6) Count existing rows (does not expose row contents).
 select count(*) as existing_row_count
 from public.linc_users;
 
--- 5) Check duplicate user_id values. Any returned row means the migration's
--- unique index may fail and data must be reviewed before schema changes.
-select user_id, count(*) as duplicate_count
-from public.linc_users
-group by user_id
-having count(*) > 1
-order by duplicate_count desc
-limit 100;
-
--- 6) Check null/blank identifiers before relying on user_id uniqueness.
+-- 7) Check duplicate user_id values without returning identifiers.
+-- duplicate_group_count > 0 means duplicates exist; duplicate_row_count is
+-- the total number of rows belonging to duplicated user_id groups.
 select
-  count(*) filter (where user_id is null) as null_user_id_count,
-  count(*) filter (where btrim(user_id) = '') as blank_user_id_count
-from public.linc_users;
+  count(*) as duplicate_group_count,
+  coalesce(sum(group_size), 0) as duplicate_row_count,
+  coalesce(sum(group_size - 1), 0) as excess_duplicate_row_count
+from (
+  select count(*) as group_size
+  from public.linc_users as u
+  where nullif(btrim(to_jsonb(u)->>'user_id'), '') is not null
+  group by to_jsonb(u)->>'user_id'
+  having count(*) > 1
+) duplicate_groups;
 
--- 7) Check status distribution and rows missing timestamps, without exposing IDs.
+-- 8) Check null/blank identifiers before relying on user_id uniqueness.
 select
-  coalesce(status, '<NULL>') as status,
+  count(*) filter (where to_jsonb(u)->>'user_id' is null) as null_or_missing_user_id_count,
+  count(*) filter (where btrim(coalesce(to_jsonb(u)->>'user_id', '')) = '') as blank_user_id_count
+from public.linc_users as u;
+
+-- 9) Check status distribution and rows missing timestamps, without exposing IDs.
+select
+  coalesce(to_jsonb(u)->>'status', '<NULL>') as status,
   count(*) as row_count,
-  count(*) filter (where created_at is null) as missing_created_at_count,
-  count(*) filter (where last_heartbeat is null) as missing_last_heartbeat_count,
-  count(*) filter (where updated_at is null) as missing_updated_at_count
-from public.linc_users
-group by status
+  count(*) filter (where to_jsonb(u)->>'created_at' is null) as missing_or_null_created_at_count,
+  count(*) filter (where to_jsonb(u)->>'last_heartbeat' is null) as missing_or_null_last_heartbeat_count,
+  count(*) filter (where to_jsonb(u)->>'updated_at' is null) as missing_or_null_updated_at_count
+from public.linc_users as u
+group by to_jsonb(u)->>'status'
 order by status;
