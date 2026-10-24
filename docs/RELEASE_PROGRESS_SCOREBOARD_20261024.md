@@ -1,6 +1,6 @@
 # L!nc Backend — release progress scoreboard
 
-**As of: 2026-10-24 17:45–17:50 Asia/Bangkok**  
+**As of: 2026-10-24 17:52–17:55 Asia/Bangkok**  
 **Scope:** first safely usable end-to-end Backend MVP, not the complete product UI. The approved/deployed Client source is not currently confirmed, so this is a conservative engineering estimate, not a claim that the whole L!nc app is this complete.
 
 ## Executive status
@@ -15,7 +15,7 @@ The Candidate removes the import-time JSON file write and adds a configured Supa
 - **Estimated path-to-MVP completion: about 30% done / 70% remaining.** This is a weighted estimate of release gates, not a count of code lines or commits.
 - **Current Production service: NOT operational.** A read-only probe returned HTTP 500 `FUNCTION_INVOCATION_FAILED` from both `/health` and `/ready` at 2026-10-24 10:45 UTC. The active Production deployment is still `dpl_2ELeGpWoXTL6wFFvLEXxrLZzRgAk`, from `main` SHA `336e2fcdd1b9f0841432817dcafe955b45700eef`.
 - Candidate PR #2 remains **Draft and unmerged**. The code branch has not been validated as a deployed end-to-end release. No Production deployment/configuration or persistent DB was changed.
-- Latest Candidate HEAD at this checkpoint: `94e145aa7442b0fc5d918bd0d546f27f1790bbf8`. GitHub Actions runs [#320](https://github.com/jaiioffice-svg/linc-tech-ex-backend/actions/runs/40086431551) and [#321](https://github.com/jaiioffice-svg/linc-tech-ex-backend/actions/runs/40086436042) both passed **81/81 tests, 0 failed**. These are CI tests; they do not prove live Supabase, BFF, LINE, or Production integration.
+- Latest verified runtime/CI commit: `b2610f5306332e2a7a686c556333fe3547e1fcf9`. GitHub Actions runs [#328](https://github.com/jaiioffice-svg/linc-tech-ex-backend/actions/runs/40087654809) and [#329](https://github.com/jaiioffice-svg/linc-tech-ex-backend/actions/runs/40087656936) both passed **81/81 tests, 0 failed**. Both runs also passed `npm audit --audit-level=high` with **0 vulnerabilities** and `node --check` on six runtime JavaScript files. These are CI tests; they do not prove live Supabase, BFF, LINE, or Production integration.
 
 ## Weighted completion model
 
@@ -24,7 +24,7 @@ The weighting is an explicit planning estimate for the **first safe end-to-end B
 | Workstream | Weight | Estimated completion | Contribution | Evidence / blocker |
 |---|---:|---:|---:|---|
 | Backend route/controller foundation, validation, ownership guards, outbox logic | 25% | 65% | 16.25% | Candidate code and regression coverage exist; verified session middleware is intentionally fail-closed until a trusted BFF is connected. |
-| Repeatable dependency install and automated CI | 10% | 100% | 10% | Exact Candidate HEAD `94e145a`: runs #320 and #321 each passed 81/81. This is not end-to-end proof. |
+| Repeatable dependency install, audit and automated CI | 10% | 100% | 10% | Commit `b2610f5`: runs #328 and #329 passed 81/81, `npm audit --audit-level=high` reported 0 vulnerabilities, and `node --check` passed for six runtime files. This is not end-to-end proof. |
 | Hosted Supabase migration/RLS/RPC and real CRUD verification in an isolated non-production project | 20% | 10% | 2% | Core/replay/outbox migrations and PGlite tests exist; no migration was applied to a persistent database and actual Preview project isolation is unconfirmed. |
 | Approved Client session → trusted BFF → signed Backend assertion | 20% | 0% | 0% | Contract documentation exists, but no approved Client/BFF repo/session source or verified deployed commit has been identified in the connected GitHub/Vercel inventory. |
 | Provider-verified guardian pairing, explicit consent, Official Account friend state and real LINE dispatcher | 15% | 5% | 0.75% | Design contract now documented; no pairing implementation, dispatcher, or live LINE delivery exists. Legacy recipient IDs are blocked. |
@@ -51,7 +51,7 @@ Therefore, **the ~30% figure applies only to the first safe Backend MVP**, not t
 1. The Candidate has a service-key + signed internal assertion + verified-principal + request-validation middleware chain. Missing trusted user identity fails closed; the BFF/session bridge is not implemented.
 2. Assertion replay protection and the durable termination outbox have embedded PostgreSQL-compatible regression tests.
 3. The outbox now **blocks** events and stores no recipient when the only evidence is a legacy `guardian_line_id`; the app adapter also rejects unsafe RPC responses.
-4. Candidate HEAD `94e145a` passed both current GitHub Actions workflows, 81/81 tests each.
+4. Runtime/CI commit `b2610f5` passed both GitHub Actions runs, 81/81 tests each, dependency audit with 0 vulnerabilities, and six-file JavaScript syntax checks.
 5. Release-gate, outbox fail-closed, and guardian-pairing contracts are saved in this branch.
 
 ## Remaining gates in dependency order
