@@ -55,6 +55,53 @@ test('database fails closed on Vercel when Supabase is not configured', async ()
     });
 });
 
+test('database adapter rejects noncanonical user IDs before local access or network requests', async () => {
+    const db = require('../db');
+    const originalFetch = global.fetch;
+    let fetchCalls = 0;
+    global.fetch = async () => {
+        fetchCalls += 1;
+        return new Response('[]', {
+            status: 200,
+            headers: { 'content-type': 'application/json' }
+        });
+    };
+
+    const invalidUserIds = [
+        undefined,
+        null,
+        42,
+        '',
+        '   ',
+        ' padded-user ',
+        'u'.repeat(201),
+        'user' + String.fromCharCode(1) + 'id'
+    ];
+
+    try {
+        await withEnv({
+            VERCEL: '1',
+            VERCEL_ENV: 'preview',
+            SUPABASE_URL: 'https://example-project.supabase.co',
+            SUPABASE_SERVICE_ROLE_KEY: 'sb_secret_test_only'
+        }, async () => {
+            for (const userId of invalidUserIds) {
+                const isInvalidUserId = error =>
+                    error instanceof TypeError &&
+                    error.message === 'A valid userId is required';
+
+                await assert.rejects(db.getUser(userId), isInvalidUserId);
+                await assert.rejects(db.saveUser({ userId, grade: 'M1' }), isInvalidUserId);
+                await assert.rejects(db.recordAppTermination(userId), isInvalidUserId);
+            }
+        });
+
+        assert.equal(fetchCalls, 0, 'invalid identifiers must be rejected before any database request');
+    } finally {
+        global.fetch = originalFetch;
+    }
+});
+
 test('getUser reads a profile from Supabase REST', async () => {
     const db = require('../db');
     const originalFetch = global.fetch;
