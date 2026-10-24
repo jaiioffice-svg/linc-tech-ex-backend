@@ -1,6 +1,6 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { validateApiKey } = require('../auth');
+const { validateApiKey, requireVerifiedEndUser } = require('../auth');
 
 function mockResponse() {
     return {
@@ -74,4 +74,36 @@ test('calls next when request API key matches', () => {
         if (previous === undefined) delete process.env.LINC_API_KEY;
         else process.env.LINC_API_KEY = previous;
     }
+});
+
+test('end-user route gate fails closed when no verified principal is present', () => {
+    const res = mockResponse();
+    let nextCalled = false;
+    requireVerifiedEndUser({ body: { userId: 'claimed-user' } }, res, () => { nextCalled = true; });
+    assert.equal(res.statusCode, 503);
+    assert.equal(res.body.message, 'End-user identity verification is not configured');
+    assert.equal(nextCalled, false);
+});
+
+test('end-user route gate rejects a body identifier that differs from the verified principal', () => {
+    const res = mockResponse();
+    let nextCalled = false;
+    requireVerifiedEndUser({
+        auth: { userId: 'account-a' },
+        body: { userId: 'account-b' }
+    }, res, () => { nextCalled = true; });
+    assert.equal(res.statusCode, 403);
+    assert.equal(res.body.message, 'Requested user does not match authenticated identity');
+    assert.equal(nextCalled, false);
+});
+
+test('end-user route gate accepts a verified principal when request contains no body identifier', () => {
+    const res = mockResponse();
+    let nextCalled = false;
+    requireVerifiedEndUser({
+        auth: { userId: 'account-a' },
+        body: { grade: 'M1' }
+    }, res, () => { nextCalled = true; });
+    assert.equal(res.statusCode, 200);
+    assert.equal(nextCalled, true);
 });
