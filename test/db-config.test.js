@@ -48,6 +48,43 @@ test('Supabase config requires both URL and service key', () => {
 });
 
 
+test('Supabase config fails closed on blank, padded, or control-character environment values', async () => {
+    const originalFetch = global.fetch;
+    let fetchCalls = 0;
+    global.fetch = async () => {
+        fetchCalls += 1;
+        return new Response('[]', {
+            status: 200,
+            headers: { 'content-type': 'application/json' }
+        });
+    };
+
+    try {
+        const invalidConfigs = [
+            { SUPABASE_URL: '   ', SUPABASE_SERVICE_ROLE_KEY: 'sb_secret_test_only_key' },
+            { SUPABASE_URL: ' https://example-project.supabase.co', SUPABASE_SERVICE_ROLE_KEY: 'sb_secret_test_only_key' },
+            { SUPABASE_URL: 'https://example-project.supabase.co', SUPABASE_SERVICE_ROLE_KEY: ' sb_secret_test_only_key' },
+            { SUPABASE_URL: 'https://example-project.supabase.co', SUPABASE_SERVICE_ROLE_KEY: 'sb_secret_test_only_key\n' },
+            { SUPABASE_URL: 'https://example-project.supabase.co\u0000', SUPABASE_SERVICE_ROLE_KEY: 'sb_secret_test_only_key' }
+        ];
+
+        for (const values of invalidConfigs) {
+            await withEnvAsync({
+                ...values,
+                VERCEL: '1',
+                VERCEL_ENV: 'preview'
+            }, async () => {
+                assert.equal(hasSupabaseConfig(), false);
+                assert.equal(isDatabaseConfigured(), false);
+                assert.equal(await checkDatabaseConnection(), false);
+            });
+        }
+        assert.equal(fetchCalls, 0);
+    } finally {
+        global.fetch = originalFetch;
+    }
+});
+
 test('Vercel rejects unsafe Supabase endpoint URLs before sending service credentials', async () => {
     const originalFetch = global.fetch;
     let fetchCalls = 0;
