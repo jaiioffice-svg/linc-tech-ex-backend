@@ -1,4 +1,5 @@
 const crypto = require('crypto');
+const { consumeInternalAssertion } = require('./db');
 
 const ASSERTION_HEADER = 'x-linc-user-assertion';
 const EXPECTED_ISSUER = 'linc-client-bff';
@@ -43,7 +44,8 @@ function safeEqual(left, right) {
     return a.length === b.length && crypto.timingSafeEqual(a, b);
 }
 
-function authenticateInternalAssertion(req, res, next) {
+function createInternalAssertionMiddleware({ consumeAssertionId = consumeInternalAssertion } = {}) {
+    return async function authenticateInternalAssertion(req, res, next) {
     const secret = process.env.LINC_INTERNAL_AUTH_SECRET;
 
     if (typeof secret !== 'string' || Buffer.byteLength(secret, 'utf8') < 32) {
@@ -136,6 +138,24 @@ function authenticateInternalAssertion(req, res, next) {
             return rejectAssertion(res);
         }
 
+        let consumed;
+        try {
+            consumed = await consumeAssertionId(claims.jti, claims.exp);
+        } catch (error) {
+            const reason = error && error.code === 'DB_NOT_CONFIGURED'
+                ? 'DB_NOT_CONFIGURED'
+                : 'DB_UNAVAILABLE';
+            console.error('[ASSERTION_REPLAY_STORE]', reason);
+            return res.status(503).json({
+                success: false,
+                message: 'Identity verification service is temporarily unavailable'
+            });
+        }
+
+        if (consumed !== true) {
+            return rejectAssertion(res);
+        }
+
         req.auth = Object.freeze({
             userId: claims.sub,
             issuer: EXPECTED_ISSUER,
@@ -147,8 +167,12 @@ function authenticateInternalAssertion(req, res, next) {
     } catch (_) {
         return rejectAssertion(res);
     }
+    };
 }
 
+const authenticateInternalAssertion = createInternalAssertionMiddleware();
+
 module.exports = {
-    authenticateInternalAssertion
+    authenticateInternalAssertion,
+    createInternalAssertionMiddleware
 };
