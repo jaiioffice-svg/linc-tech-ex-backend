@@ -1,6 +1,6 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { isDatabaseConfigured, hasSupabaseConfig, classifyDatabaseFailure } = require('../db');
+const { isDatabaseConfigured, hasSupabaseConfig, checkDatabaseConnection, classifyDatabaseFailure } = require('../db');
 
 function withEnv(values, callback) {
     const keys = Object.keys(values);
@@ -18,6 +18,23 @@ function withEnv(values, callback) {
     }
 }
 
+async function withEnvAsync(values, callback) {
+    const keys = Object.keys(values);
+    const previous = Object.fromEntries(keys.map(key => [key, process.env[key]]));
+    for (const [key, value] of Object.entries(values)) {
+        if (value === undefined) delete process.env[key];
+        else process.env[key] = value;
+    }
+    try {
+        return await callback();
+    } finally {
+        for (const key of keys) {
+            if (previous[key] === undefined) delete process.env[key];
+            else process.env[key] = previous[key];
+        }
+    }
+}
+
 test('Supabase config requires both URL and service key', () => {
     withEnv({ SUPABASE_URL: 'https://example.supabase.co', SUPABASE_SERVICE_ROLE_KEY: undefined }, () => {
         assert.equal(hasSupabaseConfig(), false);
@@ -28,6 +45,81 @@ test('Supabase config requires both URL and service key', () => {
     withEnv({ SUPABASE_URL: 'https://example.supabase.co', SUPABASE_SERVICE_ROLE_KEY: 'test-only-key' }, () => {
         assert.equal(hasSupabaseConfig(), true);
     });
+});
+
+
+test('Vercel rejects unsafe Supabase endpoint URLs before sending service credentials', async () => {
+    const originalFetch = global.fetch;
+    let fetchCalls = 0;
+    global.fetch = async () => {
+        fetchCalls += 1;
+        return new Response('[]', {
+            status: 200,
+            headers: { 'content-type': 'application/json' }
+        });
+    };
+
+    try {
+        const invalidUrls = [
+            'http://example-project.supabase.co',
+            'https://attacker.example',
+            'https://user:password@example-project.supabase.co',
+            'https://example-project.supabase.co?token=unexpected',
+            'https://example-project.supabase.co/unexpected-path',
+            'https://example-project.supabase.co/rest/v2'
+        ];
+
+        for (const url of invalidUrls) {
+            await withEnvAsync({
+                SUPABASE_URL: url,
+                SUPABASE_SERVICE_ROLE_KEY: 'sb_secret_test_only_key',
+                VERCEL: '1',
+                VERCEL_ENV: 'preview'
+            }, async () => {
+                assert.equal(isDatabaseConfigured(), false, `URL should be rejected: ${url}`);
+                await assert.rejects(
+                    checkDatabaseConnection(),
+                    error => error && error.code === 'DB_NOT_CONFIGURED'
+                );
+            });
+        }
+
+        assert.equal(fetchCalls, 0, 'invalid endpoints must be rejected before fetch receives the service key');
+    } finally {
+        global.fetch = originalFetch;
+    }
+});
+
+test('Vercel accepts standard Supabase project URLs with an optional /rest/v1 suffix', async () => {
+    const originalFetch = global.fetch;
+    let requestedUrl = '';
+
+    global.fetch = async url => {
+        requestedUrl = String(url);
+        return new Response('[]', {
+            status: 200,
+            headers: { 'content-type': 'application/json' }
+        });
+    };
+
+    try {
+        await withEnvAsync({
+            SUPABASE_URL: 'https://example-project.supabase.co/rest/v1',
+            SUPABASE_SERVICE_ROLE_KEY: 'sb_secret_test_only_key',
+            VERCEL: '1',
+            VERCEL_ENV: 'preview'
+        }, async () => {
+            assert.equal(isDatabaseConfigured(), true);
+            assert.equal(await checkDatabaseConnection(), true);
+        });
+
+        assert.equal(
+            requestedUrl,
+            'https://example-project.supabase.co/rest/v1/linc_users?select=user_id&limit=1'
+        );
+    } finally {
+        global.fetch = originalFetch;
+    }
 });
 
 test('local development can use local storage when Supabase is not configured', () => {
