@@ -364,3 +364,14 @@ Fresh GET-only Production probes at 09:22 UTC returned:
 - `GET /ready`: HTTP 500 `FUNCTION_INVOCATION_FAILED`, request ID `sin1::2jmpn-1792833731860-95b962b160ed`.
 
 Active Production deployment remains `dpl_2ELeGpWoXTL6wFFvLEXxrLZzRgAk`, from `main` SHA `336e2fcdd1b9f0841432817dcafe955b45700eef`. No Production deployment or setting change, secret read, SQL, persistent database write, Preview SSO bypass, or LINE message occurred.
+
+
+## Atomic app-termination outbox added to Candidate — 2026-10-24
+
+Added migration `supabase/migrations/20261024_004_notification_outbox.sql`. Its `linc_record_app_termination(text)` function locks the profile row and commits the `app_deleted` state plus a durable notification-outbox event together. If the outbox insert errors, the entire transaction rolls back. Repeated termination is idempotent and does not create a second event. If a guardian LINE ID exists the outbox status is `pending`; if no guardian is linked it is `blocked` and has no recipient. The application callback logs only event ID, event reason, event status and a boolean guardian-linked field; it does not log a raw user ID or LINE ID.
+
+The test-only embedded PostgreSQL suite `test/notification-outbox-postgres.test.js` runs the core schema, replay migration and outbox migration in sequence. It tests first-use recording, duplicate deletion, absent guardian, missing user, least-privilege role access, RLS, and rollback when an outbox insert is forced to fail. The broader suite also tests the controller's local adapter and the Supabase RPC request/response validation.
+
+Exact Runtime/test commit `a2f986e1a2b05aa67cbc223065bc65f8e338f87a` passed **80/80 tests**, after clean `npm ci` (86 packages); `npm audit` reported 0 vulnerabilities; JavaScript syntax, Vercel scope/config and `git diff --check` passed; GitHub Actions [run #305](https://github.com/jaiioffice-svg/linc-tech-ex-backend/actions/runs/40082133714) succeeded. The latest Candidate code has not yet been re-deployed to Preview or Production.
+
+**Delivery boundary:** this implements durable recording only. No worker currently dispatches pending events, and no LINE API message was sent or verified. `pending` means waiting for a future dispatcher, not delivered. The migrations remain unapplied to Supabase or any persistent database. Review and apply `20261022_002_linc_core.sql`, `20261024_003_auth_assertion_replay.sql`, and `20261024_004_notification_outbox.sql` only to a confirmed isolated non-production Supabase project after checking its existing schema/roles/RLS. Keep Production unchanged, PR #2 Draft/unmerged, and branch auto-deployment paused.
