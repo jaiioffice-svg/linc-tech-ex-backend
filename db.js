@@ -46,8 +46,11 @@ function supabaseBaseUrl() {
         .replace(/\/rest\/v1$/i, '');
 }
 
+const DATABASE_REQUEST_TIMEOUT_MS = 8000;
+
 async function supabaseRequest(resource, options = {}) {
     assertDatabaseAvailable();
+
     if (!hasSupabaseConfig()) {
         const error = new Error('Supabase is not configured');
         error.code = 'DB_NOT_CONFIGURED';
@@ -55,22 +58,24 @@ async function supabaseRequest(resource, options = {}) {
     }
 
     const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+    const requestUrl = `${supabaseBaseUrl()}/rest/v1/${resource}`;
+    const requestOptions = {
+        ...options,
+        signal: options.signal || AbortSignal.timeout(DATABASE_REQUEST_TIMEOUT_MS),
+        headers: {
+            apikey: serviceKey,
+            ...(!serviceKey.startsWith('sb_secret_')
+                ? { Authorization: `Bearer ${serviceKey}` }
+                : {}),
+            'Content-Type': 'application/json',
+            ...(options.headers || {})
+        }
+    };
+
     let response;
+
     try {
-        response = await fetch(`${supabaseBaseUrl()}/rest/v1/${resource}`, {
-            ...options,
-            headers: {
-                // New Supabase sb_secret_* keys are opaque API keys, not JWTs.
-                // Send them only through the apikey header; putting one in
-                // Authorization: Bearer makes Supabase attempt JWT validation.
-                apikey: serviceKey,
-                ...(!serviceKey.startsWith('sb_secret_')
-                    ? { Authorization: `Bearer ${serviceKey}` }
-                    : {}),
-                'Content-Type': 'application/json',
-                ...(options.headers || {})
-            }
-        });
+        response = await fetch(requestUrl, requestOptions);
     } catch (_) {
         const error = new Error('Database service is temporarily unavailable');
         error.code = 'DB_UNAVAILABLE';
@@ -78,18 +83,22 @@ async function supabaseRequest(resource, options = {}) {
     }
 
     if (!response.ok) {
-        // Keep upstream diagnostics safe: only retain a short PostgREST error code,
-        // never log or return the upstream response body or database details.
         let upstreamCode = null;
+
         try {
             const payload = await response.clone().json();
-            if (payload && typeof payload.code === 'string' &&
-                /^[A-Z0-9_]{3,24}$/.test(payload.code)) {
+
+            if (
+                payload &&
+                typeof payload.code === 'string' &&
+                /^[A-Z0-9_]{3,24}$/.test(payload.code)
+            ) {
                 upstreamCode = payload.code;
             }
         } catch (_) {
-            // Non-JSON responses (for example, an incorrect project URL) are expected here.
+            // Ignore non-JSON or timed-out error bodies; never expose upstream content.
         }
+
         const error = new Error('Database request failed');
         error.code = 'DB_UNAVAILABLE';
         error.status = response.status;
@@ -97,8 +106,14 @@ async function supabaseRequest(resource, options = {}) {
         throw error;
     }
 
-    const body = await response.text();
-    return body ? JSON.parse(body) : null;
+    try {
+        const body = await response.text();
+        return body ? JSON.parse(body) : null;
+    } catch (_) {
+        const error = new Error('Database response is temporarily unavailable');
+        error.code = 'DB_UNAVAILABLE';
+        throw error;
+    }
 }
 
 function normalizeSupabaseUser(row) {
