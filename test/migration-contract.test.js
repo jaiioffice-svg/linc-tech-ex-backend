@@ -23,9 +23,11 @@ function isDeclared(column) {
 }
 
 test('base migration declares every column selected and written by the repository layer', () => {
-    const selectMatch = db.match(/select=([^'`]+)&limit=1/);
-    assert.ok(selectMatch, 'db.js must expose a recognizable SELECT column list');
-    const selectedColumns = selectMatch[1].split(',').map(column => column.trim());
+    const selectMatches = [...db.matchAll(/select=([^'`&]+)/g)];
+    assert.ok(selectMatches.length > 0, 'db.js must expose recognizable SELECT column lists');
+    const selectedColumns = selectMatches.flatMap(match =>
+        match[1].split(',').map(column => column.trim())
+    );
 
     const rowMatch = db.match(/const row = \{([\s\S]*?)\n\s*\};/);
     assert.ok(rowMatch, 'db.js must expose a recognizable persisted row shape');
