@@ -10,18 +10,17 @@ This document describes the current L!nc Backend Candidate and the intended appl
 - API: Node.js 22, Express, hosted on Vercel Functions.
 - Persistence: Supabase Postgres through PostgREST using server-only credentials.
 - Tests: Node's built-in test runner (node --test).
-- Notification provider: LINE is a future/partially specified integration. The current Candidate logs an ALERT_PENDING event without guardian identifiers; this does not mean a notification was sent.
+- Notification provider: LINE delivery is not implemented. The Candidate records app-termination events in the outbox; until provider-verified guardian pairing and explicit consent exist, the event remains `blocked` with `recipient_line_id = NULL`. An outbox record/log is not proof that a LINE message was sent.
 
 ## 3. Current code layout
 
 The current Backend repository is intentionally kept in its existing flat layout while recovery is underway.
 
 - api/[...path].js — Vercel catch-all entry adapter; keep its routing behavior covered by tests.
-- auth.js — shared-service-key gate and fail-closed verified-user gate.
+- auth.js — shared-service-key gate (configured `LINC_API_KEY` must be at least 32 UTF-8 bytes) and fail-closed verified-user gate.
 - internal-assertion.js — validates short-lived HS256 assertions signed by the trusted Client BFF.
 - error-handler.js — centralized sanitized 404 and error responses.
 - request-validation.js — validates optional profile identifiers and grade payloads after all authentication gates.
-- request-validation.js — bounded shape validation for user-related request bodies.
 - controllers.js — registration, heartbeat, and delete-alert handlers.
 - db.js — Supabase REST adapter; local JSON persistence is restricted to local development.
 - server.js — Express app, CORS, health/readiness, protected API routes.
@@ -39,7 +38,7 @@ The frontend is a separate codebase/snapshot and must not be represented as inte
 
 1. The Client obtains a short-lived access token from the approved identity provider. The deployed Client/session contract is not yet confirmed.
 2. The Client sends its access token over HTTPS. A public Client must never contain LINC_API_KEY, SUPABASE_SERVICE_ROLE_KEY, or other server-side credentials.
-3. The Client BFF must first validate the user's own session against its authoritative server-side session store. It then signs a short-lived internal HS256 assertion for one allowed Backend route. The Candidate verifier in internal-assertion.js validates signature, issuer, audience, subject, issue/expiry times, assertion ID format and exact route scope before creating req.auth.userId. The verifier is implemented but remains disabled until the approved BFF is wired and LINC_INTERNAL_AUTH_SECRET is configured server-side.
+3. The Client BFF must first validate the user's own session against its authoritative server-side session store. It then signs a short-lived internal HS256 assertion for one allowed Backend route. The Candidate verifier in internal-assertion.js validates signature, issuer, audience, canonical subject, strict claim allowlist, issue/expiry times, assertion ID format and exact route scope before creating req.auth.userId. It fails closed until the approved BFF is wired and `LINC_INTERNAL_AUTH_SECRET` is configured server-side.
 4. User-owned database operations derive the owner from req.auth.userId; any user ID in a body is at most a consistency check and must never override the verified principal.
 5. Database writes use the Candidate schema contract in supabase/migrations/20261022_002_linc_core.sql. Confirm that schema against the intended non-production project before applying any migration.
 6. Events such as heartbeats or app-delete alerts must be persisted before they are marked as successful. Notification delivery should use an outbox/queue with a stable event ID, retry policy, delivery status, and idempotency so duplicate requests do not cause duplicate messages.
