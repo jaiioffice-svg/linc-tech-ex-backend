@@ -116,3 +116,31 @@ test('immediate-delete alert uses the stored guardian ID, not a request-body val
     assert.equal(alertPayload.guardianLineId, 'verified-stored-line-id');
     assert.equal(readState().users['delete-user'].status, 'app_deleted');
 });
+
+test('heartbeat cannot reactivate a profile marked app_deleted', async () => {
+    fs.writeFileSync(process.env.LINC_DATA_FILE, JSON.stringify({
+        schools: {},
+        users: {
+            'deleted-user': {
+                userId: 'deleted-user',
+                grade: 'M1',
+                guardianLineId: null,
+                createdAt: Date.now(),
+                status: 'app_deleted',
+                deletedAt: Date.now() - 1000
+            }
+        },
+        revenue: { total: 0 }
+    }));
+
+    const res = mockResponse();
+    await handleHeartbeat({
+        body: { userId: 'deleted-user', grade: 'M1' }
+    }, res);
+
+    const saved = readState().users['deleted-user'];
+    assert.equal(res.statusCode, 200);
+    assert.equal(saved.status, 'app_deleted');
+    assert.ok(saved.lastHeartbeat > 0);
+    assert.ok(saved.deletedAt > 0);
+});
