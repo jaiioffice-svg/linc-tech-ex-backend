@@ -286,3 +286,13 @@ Candidate Runtime/Test commit `8e846ca9b7182cf3140e493b43925ad4286a1f4b` include
 Latest isolated Sandbox verification: **61/61 tests pass**, 85 packages installed via `npm ci`, `npm audit` 0 vulnerabilities, syntax checks and Vercel branch-scope/config and diff checks pass. GitHub Actions [run #225](https://github.com/jaiioffice-svg/linc-tech-ex-backend/actions/runs/40078015703) passed. Strict assertions now reject unsupported JWT header fields and an `nbf` claim that is not-before the token's own expiry.
 
 The implementation is a backend-side verifier only. It does not validate the Client's opaque session itself, does not consume `jti` from a replay store, and does not configure `LINC_INTERNAL_AUTH_SECRET`. The trusted BFF must validate the session and sign assertions using the documented [BFF contract](https://github.com/jaiioffice-svg/linc-tech-ex-backend/blob/fix/linc-backend-clean-pr/docs/BFF_ASSERTION_CONTRACT.md). Keep PR #2 Draft/unmerged, deployment paused, and do not claim authenticated Preview acceptance or Production recovery.
+
+
+
+## Latest read-only Production recheck — 2026-10-24 08:27 UTC (15:27 Thailand time)
+
+Production still returns HTTP 500 `FUNCTION_INVOCATION_FAILED` for both health/readiness routes:
+- `GET /health`: `sin1::46n9p-1792830453705-eb468e1052d1`.
+- `GET /ready`: `sin1::t97h2-1792830454833-3b0a829da6e8`.
+
+These requests were GET-only and made after the Candidate gained the signed BFF assertion verifier. No Production code/config change or deployment occurred. The new verifier is in the unmerged Candidate branch, the BFF signing integration is not yet connected, and `LINC_INTERNAL_AUTH_SECRET` is not configured for the live service. Production availability remains unresolved.
