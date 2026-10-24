@@ -2,6 +2,7 @@ const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
 const { notFoundHandler, errorHandler } = require('./error-handler');
+const { validateUserRequest } = require('./request-validation');
 const {
     handleUserRegistration,
     handleHeartbeat,
@@ -60,6 +61,7 @@ app.post(
     '/api/v1/heartbeat',
     validateApiKey,
     requireVerifiedEndUser,
+    validateUserRequest,
     handleHeartbeat
 );
 
@@ -67,6 +69,7 @@ app.post(
     '/api/v1/users/register',
     validateApiKey,
     requireVerifiedEndUser,
+    validateUserRequest,
     handleUserRegistration
 );
 
@@ -74,6 +77,7 @@ app.post(
     '/api/v1/alert/delete',
     validateApiKey,
     requireVerifiedEndUser,
+    validateUserRequest,
     (req, res) => handleImmediateDelete(req, res, sendEmergencySignal)
 );
 
