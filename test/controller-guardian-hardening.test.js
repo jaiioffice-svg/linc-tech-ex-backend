@@ -33,6 +33,7 @@ function readState() {
 test('registration never trusts a guardian LINE ID supplied by the request body', async () => {
     const res = mockResponse();
     await handleUserRegistration({
+        auth: { userId: 'new-user' },
         body: {
             userId: 'new-user',
             grade: 'M1',
@@ -61,6 +62,7 @@ test('registration preserves a previously stored guardian LINE ID when body supp
 
     const res = mockResponse();
     await handleUserRegistration({
+        auth: { userId: 'existing-user' },
         body: {
             userId: 'existing-user',
             grade: 'M2',
@@ -77,6 +79,7 @@ test('registration preserves a previously stored guardian LINE ID when body supp
 test('heartbeat never trusts a guardian LINE ID supplied for a newly created profile', async () => {
     const res = mockResponse();
     await handleHeartbeat({
+        auth: { userId: 'heartbeat-user' },
         body: {
             userId: 'heartbeat-user',
             grade: 'M1',
@@ -88,7 +91,7 @@ test('heartbeat never trusts a guardian LINE ID supplied for a newly created pro
     assert.equal(readState().users['heartbeat-user'].guardianLineId, null);
 });
 
-test('immediate-delete alert uses the stored guardian ID, not a request-body value', async () => {
+test('immediate-delete alert uses the authenticated profile and stored guardian ID', async () => {
     fs.writeFileSync(process.env.LINC_DATA_FILE, JSON.stringify({
         schools: {},
         users: {
@@ -106,6 +109,7 @@ test('immediate-delete alert uses the stored guardian ID, not a request-body val
     const res = mockResponse();
     let alertPayload;
     await require('../controllers').handleImmediateDelete({
+        auth: { userId: 'delete-user' },
         body: {
             userId: 'delete-user',
             guardianLineId: 'attacker-controlled-line-id'
@@ -135,6 +139,7 @@ test('heartbeat cannot reactivate a profile marked app_deleted', async () => {
 
     const res = mockResponse();
     await handleHeartbeat({
+        auth: { userId: 'deleted-user' },
         body: { userId: 'deleted-user', grade: 'M1' }
     }, res);
 
@@ -143,4 +148,16 @@ test('heartbeat cannot reactivate a profile marked app_deleted', async () => {
     assert.equal(saved.status, 'app_deleted');
     assert.ok(saved.lastHeartbeat > 0);
     assert.ok(saved.deletedAt > 0);
+});
+
+test('controller rejects cross-account profile claiming before database access', async () => {
+    const res = mockResponse();
+    await handleHeartbeat({
+        auth: { userId: 'account-a' },
+        body: { userId: 'account-b', grade: 'M1' }
+    }, res);
+
+    assert.equal(res.statusCode, 403);
+    assert.equal(res.body.message, 'Requested user does not match authenticated identity');
+    assert.equal(fs.existsSync(process.env.LINC_DATA_FILE), false);
 });
