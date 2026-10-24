@@ -6,6 +6,21 @@ const app = require('../server');
 // endpoint is intentionally public, it must be explicitly reviewed rather
 // than silently bypassing the end-user identity gate.
 test('every /api/v1 route enforces service and verified end-user auth in order', () => {
+    const mountedRouters = app._router.stack.filter(
+        layer => layer.name === 'router' &&
+            layer.handle &&
+            Array.isArray(layer.handle.stack)
+    );
+
+    // This inventory deliberately inspects Express's direct route table.
+    // Fail closed if nested routers appear until this test is taught to
+    // recursively inspect mounted paths and their middleware.
+    assert.equal(
+        mountedRouters.length,
+        0,
+        'extend the API security inventory to traverse nested routers before mounting one'
+    );
+
     const routes = app._router.stack
         .filter(layer => layer.route && typeof layer.route.path === 'string')
         .map(layer => layer.route)
