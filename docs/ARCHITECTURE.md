@@ -136,3 +136,11 @@ The current Candidate's Express app now has a stable not-found handler and a fin
 - The response does not contain a stack trace or echo attacker-supplied payload.
 
 The new `test/error-handling.test.js` covers malformed JSON, an oversized request body and an unknown route. On Candidate commit `b1938566584f7ad42e732cb7d6916937ec980bda`, isolated Sandbox checks passed **41/41 tests**, `npm audit` reported 0 vulnerabilities, and GitHub Actions [run #149](https://github.com/jaiioffice-svg/linc-tech-ex-backend/actions/runs/40076554069) succeeded. This is test/CI evidence only; it does not implement user-session verification or repair the deployed Production function.
+
+## 12. Supabase network timeout and response-failure handling (2026-10-24)
+
+The database adapter now applies an 8-second abort timeout to each Supabase REST request unless a caller explicitly supplies its own signal. Network/timeout failures become a generic `DB_UNAVAILABLE` error; malformed JSON from a nominally successful upstream response also becomes `DB_UNAVAILABLE` instead of leaking a raw `SyntaxError` into the API layer. Non-success upstream responses still retain only a small validated upstream error code for internal classification and never expose the response body.
+
+Regression coverage in `test/db.test.js` verifies that a signal is attached, a simulated `AbortError` is normalized, and an invalid upstream JSON body is returned as a generic database-unavailable error. Latest Runtime/test commit `e9eb8f10d9704684fd26dc66910a2fb2fa244942` passed **43/43 tests** in the isolated Sandbox, `npm audit` reported 0 vulnerabilities, `node --check server.js` and `node --check db.js` passed, Vercel config/scope checks and `git diff --check` passed; GitHub Actions [run #157](https://github.com/jaiioffice-svg/linc-tech-ex-backend/actions/runs/40076735927) succeeded.
+
+This is a bounded-failure improvement for the Candidate. It does not prove real Supabase connectivity or user-session verification.
