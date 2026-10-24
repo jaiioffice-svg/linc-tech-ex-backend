@@ -5,7 +5,7 @@
 This document describes the Candidate branch only. It is not evidence that the Candidate is deployed or that the approved Client calls these routes. PR #2 remains Draft and unmerged.
 
 Every protected route under `/api/v1` requires both:
-- `x-linc-api-key`: a cryptographically random server-to-server secret of at least 32 UTF-8 bytes, shared only by the trusted BFF and Backend. The Backend returns HTTP 503 if its configured `LINC_API_KEY` environment value is missing or undersized; it returns HTTP 401 for a missing or incorrect request header when configuration is valid.
+- `x-linc-api-key`: a cryptographically random server-to-server secret of at least 32 UTF-8 bytes, shared only by the trusted BFF and Backend. The configured `LINC_API_KEY` must have no leading/trailing whitespace or ASCII control characters. The Backend returns HTTP 503 if the configured key is missing, undersized, padded, or malformed; it returns HTTP 401 for a missing or incorrect request header when configuration is valid.
 - `x-linc-user-assertion`: a short-lived signed assertion minted by the BFF only after it verifies the user's authoritative session.
 
 The Backend takes the user ID from the signed `sub` claim. A body-supplied `userId` is optional and, when present, must exactly match that subject. The Client/browser/mobile app must not hold either server secret or mint assertions itself. See [BFF Assertion Contract](./BFF_ASSERTION_CONTRACT.md).
@@ -64,7 +64,7 @@ Never tell the user or guardian that a message was sent merely because the API r
 | 404 | `Target profile not found` | No profile exists for the authenticated subject when deletion is recorded. |
 | 404 | `ROUTE_NOT_FOUND` | No route matches the requested path. |
 | 413 | `REQUEST_TOO_LARGE` | JSON body exceeds the 64 KiB limit. |
-| 503 | `API authentication is not configured` | Backend `LINC_API_KEY` is missing or shorter than 32 UTF-8 bytes. |
+| 503 | `API authentication is not configured` | Backend `LINC_API_KEY` is missing, shorter than 32 UTF-8 bytes, padded with leading/trailing whitespace, or contains ASCII control characters. |
 | 503 | `End-user identity verification is not configured` | Required trusted identity verification configuration is missing/invalid. |
 | 503 | `Identity verification service is temporarily unavailable` | Durable assertion replay storage is missing or unavailable. |
 | 503 | `Required database service is not configured or is temporarily unavailable` | Required persistence service is unavailable/configuration is missing. |
