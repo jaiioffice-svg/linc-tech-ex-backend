@@ -18,8 +18,9 @@ The current Backend repository is intentionally kept in its existing flat layout
 
 - api/[...path].js — Vercel catch-all entry adapter; keep its routing behavior covered by tests.
 - auth.js — shared-service-key gate and fail-closed verified-user gate.
+- internal-assertion.js — validates short-lived HS256 assertions signed by the trusted Client BFF.
 - error-handler.js — centralized sanitized 404 and error responses.
-- request-validation.js — validates optional profile identifiers and grade payloads after both auth gates.
+- request-validation.js — validates optional profile identifiers and grade payloads after all authentication gates.
 - request-validation.js — bounded shape validation for user-related request bodies.
 - controllers.js — registration, heartbeat, and delete-alert handlers.
 - db.js — Supabase REST adapter; local JSON persistence is restricted to local development.
@@ -38,7 +39,7 @@ The frontend is a separate codebase/snapshot and must not be represented as inte
 
 1. The Client obtains a short-lived access token from the approved identity provider. The deployed Client/session contract is not yet confirmed.
 2. The Client sends its access token over HTTPS. A public Client must never contain LINC_API_KEY, SUPABASE_SERVICE_ROLE_KEY, or other server-side credentials.
-3. A reviewed server-side verifier must validate token signature/issuer/audience/expiry and revocation/session state through the approved provider before creating req.auth.userId. The existing Candidate deliberately does not create this principal and returns a fail-closed response until the verifier is implemented.
+3. The Client BFF must first validate the user's own session against its authoritative server-side session store. It then signs a short-lived internal HS256 assertion for one allowed Backend route. The Candidate verifier in internal-assertion.js validates signature, issuer, audience, subject, issue/expiry times, assertion ID format and exact route scope before creating req.auth.userId. The verifier is implemented but remains disabled until the approved BFF is wired and LINC_INTERNAL_AUTH_SECRET is configured server-side.
 4. User-owned database operations derive the owner from req.auth.userId; any user ID in a body is at most a consistency check and must never override the verified principal.
 5. Database writes use the Candidate schema contract in supabase/migrations/20261022_002_linc_core.sql. Confirm that schema against the intended non-production project before applying any migration.
 6. Events such as heartbeats or app-delete alerts must be persisted before they are marked as successful. Notification delivery should use an outbox/queue with a stable event ID, retry policy, delivery status, and idempotency so duplicate requests do not cause duplicate messages.
@@ -50,11 +51,11 @@ The frontend is a separate codebase/snapshot and must not be represented as inte
 |---|---|---|---|
 | GET | /health | Process liveness | Returns HTTP 200 without requiring database credentials |
 | GET | /ready | Dependency readiness | Returns HTTP 503 if database configuration or connection is unavailable |
-| POST | /api/v1/users/register | Create/update authenticated user's profile | Requires service API key and trusted verified principal; otherwise fails closed |
+| POST | /api/v1/users/register | Create/update authenticated user's profile | Requires service API key, signed BFF assertion, verified principal and valid payload; otherwise fails closed |
 | POST | /api/v1/heartbeat | Store heartbeat and status | Requires service API key and trusted verified principal; otherwise fails closed |
 | POST | /api/v1/alert/delete | Record app-removal alert event | Requires service API key and trusted verified principal; notification delivery is not complete |
 
-The shared-key requirement is suitable only for a trusted server-to-server/BFF path. Whether the approved Client uses such a path or calls this API directly has not been verified. Do not embed the shared key in a browser or mobile package. Choose and implement one explicit request contract before wiring production identity verification.
+The shared-key requirement and signed assertion are for a trusted server-to-server/BFF path only. The BFF must verify its own opaque session, then sign an assertion with issuer linc-client-bff, audience linc-backend, verified user sub, iat/exp no longer than 60 seconds, a fresh jti, and scope equal to the exact POST route. Do not embed the service key or assertion secret in a browser or mobile package. The assertion verifier exists in the Candidate, but the BFF integration and environment secrets are not configured; the route remains fail-closed until those gates pass. See docs/BFF_ASSERTION_CONTRACT.md.
 
 ## 6. Reliability and edge-case policy
 
@@ -167,3 +168,16 @@ This is request-shape validation only; the approved Client session contract and 
 The Supabase adapter now rejects a nominally successful response unless the user-query payload is an array of row objects with string `user_id` values. Readiness does not accept malformed row arrays as proof that the database is ready. This avoids a raw `TypeError` when a proxy, endpoint or mock returns a JSON object rather than PostgREST's expected array.
 
 New regression test in `test/db.test.js` returns a valid HTTP 200 with an object instead of a row array and asserts a generic `DB_UNAVAILABLE` result, then verifies readiness treats the malformed shape as unavailable. Exact Runtime/test commit `b779f254ae7023131df042eb181804f803cc3769` passed **51/51 tests** in a fresh isolated Sandbox, `npm ci` installed 85 packages, `npm audit` reported 0 vulnerabilities, backend `node --check` tests passed, Vercel config/scope checks and `git diff --check` passed. GitHub Actions [run #189](https://github.com/jaiioffice-svg/linc-tech-ex-backend/actions/runs/40077335065) succeeded.
+
+## 15. Trusted BFF assertion authentication — 2026-10-24
+
+The Candidate now has `internal-assertion.js`, a dependency-free HS256 verifier. Each protected route requires authentication in this order:
+1. `validateApiKey` — server-to-server shared key.
+2. `authenticateInternalAssertion` — HMAC signature, fixed algorithm, issuer/audience, subject, time claims, assertion ID syntax, allowed method/route scope, and secret length.
+3. `requireVerifiedEndUser` — ensures `req.auth.userId` exists and matches any optional body userId.
+4. `validateUserRequest` — validates payload shape before the controller.
+The verifier requires a secret of at least 32 bytes and assertions with expiry no more than 60 seconds after issue time. A raw opaque Bearer token is not accepted by this internal assertion header. The BFF must issue the assertion only after independently verifying the user's session; this does not make the legacy opaque token itself trusted by the Backend.
+
+The assertion ID (`jti`) is syntactically validated but is **not yet consumed from a replay store**. Treat it as a fresh per-request ID, keep TTL at 30 seconds in the BFF, call the Backend only from the server-side BFF over HTTPS, never log or return the assertion, and retain idempotent server handlers. One-time replay protection remains a release-hardening item. Details and a complete signer example are in [docs/BFF_ASSERTION_CONTRACT.md](https://github.com/jaiioffice-svg/linc-tech-ex-backend/blob/fix/linc-backend-clean-pr/docs/BFF_ASSERTION_CONTRACT.md).
+
+The app-delete controller is now idempotent for the terminal `app_deleted` state: repeated requests do not rewrite the deletion timestamp or re-emit the pending alert event. This prevents a short-lived assertion replay from duplicating the same terminal alert transition. Real LINE delivery and a durable notification outbox remain unimplemented.
