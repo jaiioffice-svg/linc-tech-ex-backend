@@ -209,3 +209,17 @@ A fresh GET to the Production alias on 2026-10-24 returned HTTP 500 with Vercel 
 - `GET /ready`: request ID `sin1::qc57l-1792828076455-75a4bbaac9ff`.
 
 Both were read-only GET requests. This confirms the Production incident persists after the Candidate test/doc work. It does not identify a new root cause, and no Production deployment, environment edit, database operation, secret read, or SSO change was performed.
+
+
+
+## Candidate API error-handler hardening — 2026-10-24
+
+Candidate PR #2 now has a centralized final Express error middleware and stable JSON 404 handler in `server.js`:
+- malformed JSON → HTTP 400 `INVALID_JSON`;
+- JSON request exceeding the existing 64 KiB parser limit → HTTP 413 `REQUEST_TOO_LARGE`;
+- unknown route → HTTP 404 `ROUTE_NOT_FOUND`;
+- unexpected middleware error → HTTP 500 `INTERNAL_ERROR` with generic response text.
+
+Response payloads do not expose stack traces, upstream messages or raw submitted body content. Logging is limited to method, status and normalized error codes. Regression tests are in `test/error-handling.test.js`. On exact Runtime/test commit `b1938566584f7ad42e732cb7d6916937ec980bda`, isolated Sandbox checks passed **41/41 tests**, `npm audit` found 0 vulnerabilities, Vercel scope/config checks and `git diff --check` passed; GitHub Actions [run #149](https://github.com/jaiioffice-svg/linc-tech-ex-backend/actions/runs/40076554069) succeeded.
+
+This hardening does not implement the missing end-user token verifier and does not change the state of the deployed function. Latest read-only Production GETs at 07:47 UTC (14:47 Thailand) still showed HTTP 500 for both `/health` and `/ready`. Keep Candidate Draft/unmerged; no deployment, migration, database CRUD, secret read or Production configuration change occurred.
