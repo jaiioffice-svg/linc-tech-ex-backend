@@ -148,6 +148,21 @@ async function getUser(userId) {
     const rows = await supabaseRequest(
         `${SUPABASE_TABLE}?user_id=eq.${encodePostgrestFilterValue(userId)}&select=user_id,grade,guardian_line_id,created_at,last_heartbeat,status,data&limit=1`
     );
+
+    if (
+        !Array.isArray(rows) ||
+        rows.some(row =>
+            !row ||
+            typeof row !== 'object' ||
+            Array.isArray(row) ||
+            typeof row.user_id !== 'string'
+        )
+    ) {
+        const error = new Error('Database response has an unexpected shape');
+        error.code = 'DB_UNAVAILABLE';
+        throw error;
+    }
+
     return rows.length ? normalizeSupabaseUser(rows[0]) : null;
 }
 
@@ -199,7 +214,10 @@ function classifyDatabaseFailure(error) {
 async function checkDatabaseConnection() {
     if (!hasSupabaseConfig()) return false;
     const rows = await supabaseRequest(`${SUPABASE_TABLE}?select=user_id&limit=1`);
-    return Array.isArray(rows);
+    return Array.isArray(rows) && rows.every(row =>
+        row && typeof row === 'object' &&
+        !Array.isArray(row) && typeof row.user_id === 'string'
+    );
 }
 
 function calculateWeightedRevenue(grade, studentCount) {
