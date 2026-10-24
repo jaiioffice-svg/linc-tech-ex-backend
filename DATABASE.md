@@ -10,7 +10,7 @@ The JSON file adapter is for local development only. Vercel refuses database ope
 
 After the non-production isolation gate has been documented:
 
-1. Configure Preview-only `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` from the **same confirmed non-production Supabase project**. Use the Project URL from Supabase Settings → API. The Backend normalizes a trailing `/rest/v1` path.
+1. Configure Preview-only `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` from the **same confirmed non-production Supabase project**. Use the HTTPS Project URL from Supabase Settings → API. In Vercel, the Candidate accepts only standard `*.supabase.co` HTTPS hosts; it rejects userinfo, query/hash strings, and paths other than the Project URL or `/rest/v1` to avoid sending the service-role key to an arbitrary URL. Plain HTTP is allowed only for loopback Supabase during local development. The Backend normalizes a trailing `/rest/v1` path.
 2. Configure Preview-only `LINC_API_KEY` as a cryptographically random server-to-server secret of at least 32 UTF-8 bytes.
 3. Configure Preview-only `LINC_INTERNAL_AUTH_SECRET` as a separate cryptographically random secret of at least 32 UTF-8 bytes. This must be shared only between the trusted server-side BFF and Backend; do not generate assertions in a browser or mobile package.
 4. Add `LINC_ALLOWED_ORIGINS` only after confirming the approved Client/BFF origin. Values must be exact origins such as `https://app.example.com`, without path, query, or trailing slash. CORS is not authentication.
