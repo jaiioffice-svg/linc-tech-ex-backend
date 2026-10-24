@@ -19,6 +19,7 @@ The current Backend repository is intentionally kept in its existing flat layout
 - api/[...path].js — Vercel catch-all entry adapter; keep its routing behavior covered by tests.
 - auth.js — shared-service-key gate and fail-closed verified-user gate.
 - error-handler.js — centralized sanitized 404 and error responses.
+- request-validation.js — validates optional profile identifiers and grade payloads after both auth gates.
 - request-validation.js — bounded shape validation for user-related request bodies.
 - controllers.js — registration, heartbeat, and delete-alert handlers.
 - db.js — Supabase REST adapter; local JSON persistence is restricted to local development.
@@ -27,7 +28,7 @@ The current Backend repository is intentionally kept in its existing flat layout
 - package.json and package-lock.json — dependencies and reproducible install.
 - vercel.json — Vercel routing and branch-specific deployment configuration.
 - supabase/migrations/20261022_002_linc_core.sql — Candidate database schema.
-- test/ — security, DB timeout/configuration, controller, CORS, Serverless startup, error-response and routing regression tests.
+- test/ — security, DB timeout/configuration, controller, CORS, Serverless startup, input-validation, error-response and routing regression tests.
 - docs/IDENTITY_AUTH_RELEASE_GATE.md — release gates and incident evidence.
 - docs/ARCHITECTURE.md — this architecture contract.
 
@@ -137,13 +138,13 @@ The current Candidate's Express app imports stable not-found and final error mid
 - Unexpected errors return a generic HTTP 500 `INTERNAL_ERROR`; logs contain only request method, status, normalized response code, and a validated internal error code. They do not log raw request bodies, exception messages, bearer tokens, or credentials.
 - The response does not contain a stack trace or echo attacker-supplied payload.
 
-The new `test/error-handling.test.js` covers malformed JSON 400, oversized payload 413, unknown route 404, and a thrown unexpected error that must return generic 500 without exposing exception details. Candidate commit `92f4fc02f68edc81c4ae333739c2265945550980` passed **44/44 tests** in the isolated Sandbox; `npm audit` reported 0 vulnerabilities; `node --check server.js`, `node --check db.js`, and `node --check error-handler.js` passed; Vercel config/scope checks and `git diff --check` passed; GitHub Actions [run #167](https://github.com/jaiioffice-svg/linc-tech-ex-backend/actions/runs/40076900623) succeeded. This is test/CI evidence only; it does not implement user-session verification or repair the deployed Production function.
+The new `test/error-handling.test.js` covers malformed JSON 400, oversized payload 413, unknown route 404, and a thrown unexpected error that must return generic 500 without exposing exception details. Candidate commit `7bab0b7fde128febc877923c18a6fb85bd9489c5` passed **50/50 tests** in the isolated Sandbox; `npm audit` reported 0 vulnerabilities; `node --check server.js`, `node --check db.js`, `node --check error-handler.js`, and `node --check request-validation.js` passed; Vercel config/scope checks and `git diff --check` passed; GitHub Actions [run #181](https://github.com/jaiioffice-svg/linc-tech-ex-backend/actions/runs/40077113249) succeeded. This is test/CI evidence only; it does not implement user-session verification or repair the deployed Production function.
 
 ## 12. Supabase network timeout and response-failure handling (2026-10-24)
 
 The database adapter now applies an 8-second abort timeout to each Supabase REST request unless a caller explicitly supplies its own signal. Network/timeout failures become a generic `DB_UNAVAILABLE` error; malformed JSON from a nominally successful upstream response also becomes `DB_UNAVAILABLE` instead of leaking a raw `SyntaxError` into the API layer. Non-success upstream responses still retain only a small validated upstream error code for internal classification and never expose the response body.
 
-Regression coverage in `test/db.test.js` verifies that a signal is attached, a simulated `AbortError` is normalized, and invalid upstream JSON becomes a generic database-unavailable error. Candidate commit `92f4fc02f68edc81c4ae333739c2265945550980` passed **44/44 tests** in the isolated Sandbox; `npm audit` reported 0 vulnerabilities; `node --check server.js`, `node --check db.js`, and `node --check error-handler.js` passed; Vercel config/scope checks and `git diff --check` passed; GitHub Actions [run #167](https://github.com/jaiioffice-svg/linc-tech-ex-backend/actions/runs/40076900623) succeeded.
+Regression coverage in `test/db.test.js` verifies that a signal is attached, a simulated `AbortError` is normalized, and invalid upstream JSON becomes a generic database-unavailable error. Candidate commit `7bab0b7fde128febc877923c18a6fb85bd9489c5` passed **50/50 tests** in the isolated Sandbox; `npm audit` reported 0 vulnerabilities; `node --check server.js`, `node --check db.js`, `node --check error-handler.js`, and `node --check request-validation.js` passed; Vercel config/scope checks and `git diff --check` passed; GitHub Actions [run #181](https://github.com/jaiioffice-svg/linc-tech-ex-backend/actions/runs/40077113249) succeeded.
 
 This is a bounded-failure improvement for the Candidate. It does not prove real Supabase connectivity or user-session verification.
 
