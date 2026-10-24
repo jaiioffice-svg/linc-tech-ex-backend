@@ -273,7 +273,7 @@ These are GET-only availability checks. The Candidate remains Draft/unmerged; th
 
 Candidate PR #2 now includes `internal-assertion.js` and requires it in middleware order for all three protected `/api/v1/` routes: service API key → signed assertion → verified principal/body identity consistency → request validation → controller. The verifier accepts only a compact HS256 JWT with issuer `linc-client-bff`, audience `linc-backend`, a non-empty user subject, an expiry in the future and no more than 60 seconds after issue time, a jti format check, and a scope exactly matching the current POST route. A raw opaque bearer session token is not accepted as an internal assertion. If `LINC_INTERNAL_AUTH_SECRET` is unset/shorter than 32 bytes, the API remains fail-closed (503).
 
-The BFF signing example, required env vars and exact claims are documented in [docs/BFF_ASSERTION_CONTRACT.md](https://github.com/jaiioffice-svg/linc-tech-ex-backend/blob/fix/linc-backend-clean-pr/docs/BFF_ASSERTION_CONTRACT.md). The Client/BFF integration is **not yet implemented or confirmed as the approved deployed Client**. The legacy archive's opaque session must first be verified by its own trusted BFF using the authoritative session store; it must not be forwarded directly to the Backend. The current verifier validates the jti format but does not yet consume jti from a replay store; short TTL, HTTPS, no token logging and idempotent terminal alert handling mitigate the immediate risk but do not equal one-time replay prevention.
+The BFF signing example, required env vars and exact claims are documented in [docs/BFF_ASSERTION_CONTRACT.md](https://github.com/jaiioffice-svg/linc-tech-ex-backend/blob/fix/linc-backend-clean-pr/docs/BFF_ASSERTION_CONTRACT.md). The Client/BFF integration is **not yet implemented or confirmed as the approved deployed Client**. The legacy archive's opaque session must first be verified by its own trusted BFF using the authoritative session store; it must not be forwarded directly to the Backend. The earlier JTI-only limitation in this historical section is superseded by the later section “Durable assertion replay protection — current Candidate status”; the current Candidate now consumes JTI through a Supabase RPC and fails closed if the replay store is unavailable.
 
 App-delete handling was also made idempotent for an already-terminal `app_deleted` profile to avoid re-emitting the same alert event on duplicate requests. Real notification delivery still needs an outbox and provider integration.
 
@@ -285,7 +285,7 @@ Candidate Runtime/Test commit `8e846ca9b7182cf3140e493b43925ad4286a1f4b` include
 
 Latest isolated Sandbox verification: **61/61 tests pass**, 85 packages installed via `npm ci`, `npm audit` 0 vulnerabilities, syntax checks and Vercel branch-scope/config and diff checks pass. GitHub Actions [run #225](https://github.com/jaiioffice-svg/linc-tech-ex-backend/actions/runs/40078015703) passed. Strict assertions now reject unsupported JWT header fields and an `nbf` claim that is not-before the token's own expiry.
 
-The implementation is a backend-side verifier only. It does not validate the Client's opaque session itself, does not consume `jti` from a replay store, and does not configure `LINC_INTERNAL_AUTH_SECRET`. The trusted BFF must validate the session and sign assertions using the documented [BFF contract](https://github.com/jaiioffice-svg/linc-tech-ex-backend/blob/fix/linc-backend-clean-pr/docs/BFF_ASSERTION_CONTRACT.md). Keep PR #2 Draft/unmerged, deployment paused, and do not claim authenticated Preview acceptance or Production recovery.
+The implementation is a backend-side verifier only. It does not validate the Client's opaque session itself or configure `LINC_INTERNAL_AUTH_SECRET`. JTI replay protection was added later and has passed unit/Sandbox tests, but the SQL migration has not been applied or exercised against live Postgres. The trusted BFF must validate the session and sign assertions using the documented [BFF contract](https://github.com/jaiioffice-svg/linc-tech-ex-backend/blob/fix/linc-backend-clean-pr/docs/BFF_ASSERTION_CONTRACT.md). Keep PR #2 Draft/unmerged, deployment paused, and do not claim authenticated Preview acceptance or Production recovery.
 
 
 
@@ -312,3 +312,19 @@ Verification on exact Runtime/Test commit `201478ff7f49f510a39ad59c1f57b661c31cc
 - GitHub Actions [run #263](https://github.com/jaiioffice-svg/linc-tech-ex-backend/actions/runs/40079888142) succeeded.
 
 Important boundary: this run used mocked Supabase REST replies plus static migration-contract tests. The migration has **not** been executed against a database, and the SQL function has not been proven against live Postgres. Before a Preview rollout, confirm the exact non-production Supabase project, review its schema/grants/RLS, run this migration only after confirming Production isolation, then test duplicate JTI rejection and valid first-use assertions against that same Preview DB. Do not deploy/promote this Candidate, enable the BFF contract in Production, or send real LINE notifications as part of this step.
+
+
+
+## Latest Candidate and read-only Production status — 2026-10-24 09:04 UTC (16:04 Thailand)
+
+**Protected route audit:** `test/api-route-security.test.js` now inventories all non-health `/api/*` paths instead of only `/api/v1/*`. It excludes only the explicit `/api/health` and `/api/ready` routes, and requires the chain `validateApiKey → authenticateInternalAssertion → requireVerifiedEndUser → validateUserRequest` for every remaining API endpoint. The test is intended to fail if a future unversioned API route accidentally omits any guard.
+
+**Verification:** exact Runtime/test commit `5dc2ecf2343be3c10fbc3c778d1f70ff2943f859` passed **71/71 tests** in an isolated Node 22 Sandbox, `npm ci` installed 85 packages, `npm audit` found 0 vulnerabilities, syntax/config/scope/diff checks passed, and GitHub Actions [run #271](https://github.com/jaiioffice-svg/linc-tech-ex-backend/actions/runs/40080705981) succeeded. The SQL migration still has not been executed against a database; these are mocked REST and static SQL-contract tests, not real PostgreSQL integration proof.
+
+**Fresh read-only Production HTTP probes:** at 2026-10-24 09:04 UTC, `GET /health` and `GET /ready` both returned HTTP 500 `FUNCTION_INVOCATION_FAILED`:
+- `/health`: `sin1::nffrd-1792832667925-ae23b4f7c51d`.
+- `/ready`: `sin1::sjwq5-1792832668948-ce256cb18a82`.
+
+Vercel identifies the active Production deployment as `dpl_2ELeGpWoXTL6wFFvLEXxrLZzRgAk`, from `main` SHA `336e2fcdd1b9f0841432817dcafe955b45700eef`. Request-specific Runtime Logs returned no entries; a wider two-hour log query was rejected because it exceeded the Hobby plan's retention window. The grouped Runtime Errors query also returned no clusters in its selected range. Neither absence of log records nor absence of grouped errors changes the direct HTTP 500 result. Controlled fault injection previously reproduced the suspected `EROFS` failure on the exact `main` module-import chain, but that is not a Production stack trace.
+
+PR #2 remains Draft/unmerged and automatic deployment from the Candidate branch remains paused. This work did not deploy code, change Production settings/secrets, execute SQL, write database rows, bypass Preview SSO, or send LINE notifications.
