@@ -64,8 +64,8 @@ test('Supabase config fails closed on blank, padded, or control-character enviro
             { SUPABASE_URL: '   ', SUPABASE_SERVICE_ROLE_KEY: 'sb_secret_test_only_key' },
             { SUPABASE_URL: ' https://example-project.supabase.co', SUPABASE_SERVICE_ROLE_KEY: 'sb_secret_test_only_key' },
             { SUPABASE_URL: 'https://example-project.supabase.co', SUPABASE_SERVICE_ROLE_KEY: ' sb_secret_test_only_key' },
-            { SUPABASE_URL: 'https://example-project.supabase.co', SUPABASE_SERVICE_ROLE_KEY: 'sb_secret_test_only_key\n' },
-            { SUPABASE_URL: 'https://example-project.supabase.co\u0000', SUPABASE_SERVICE_ROLE_KEY: 'sb_secret_test_only_key' }
+            { SUPABASE_URL: 'https://example-project.supabase.co', SUPABASE_SERVICE_ROLE_KEY: 'sb_secret_test_only_key' + String.fromCharCode(10) },
+            { SUPABASE_URL: 'https://example-project.supabase.co' + String.fromCharCode(0), SUPABASE_SERVICE_ROLE_KEY: 'sb_secret_test_only_key' }
         ];
 
         for (const values of invalidConfigs) {
