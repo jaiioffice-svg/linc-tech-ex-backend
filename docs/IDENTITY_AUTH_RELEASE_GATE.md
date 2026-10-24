@@ -140,6 +140,13 @@ No Production code, alias, environment variable, secret, database row, migration
 - These responses establish only that Vercel deployment protection is active; they are **not** application health/readiness results. No HTTP 200/503 application outcome is claimed from this recheck.
 - I did not create a shareable/bypass URL, change SSO protection, or send POST requests. Use an authorized Vercel CLI/MCP path or an explicitly authorized test window to perform the next Preview app-level checks without broadening access to the deployment.
 
+## Controlled reproduction of the Production startup failure — 2026-10-24
+- Re-fetched the exact current `main` source at SHA `336e2fcdd1b9f0841432817dcafe955b45700eef` into a temporary isolated directory.
+- In that temporary directory, installed only that source's declared dependencies and loaded `server.js` while injecting a test-only `fs.writeFileSync` failure (`EROFS`) for the missing `linc_data.json` file. No real write was attempted: the test replaced the write function before module import and deleted the temporary source directory afterward.
+- Result: **reproduced** — the unhandled `EROFS: read-only file system` exception escaped the `server.js → checker.js → db.js` import chain before Express could serve health routes.
+- Source confirmation: `main:db.js` blob `09eeaf1749be5f107e053407878975572a2d87b4` contains the top-level write; `main:checker.js` blob `6be67cc551305129837cb1db08dcf437ad53f155` imports `db.js` at module load; `main:server.js` blob `ff45d4d4749f961500cde889a0f53e4a2f3b2ce2` imports `checker.js`.
+- This is a high-confidence source-level reproduction of the observed Production symptom, **not** a live Production stack trace. Vercel's grouped runtime-error query returned no records for the selected period and the runtime log query did not expose a function stack trace.
+
 ## Production recheck — 2026-10-24 07:26 UTC (14:26 Thailand time)
 - Read-only `GET /health`: **HTTP 500**, `FUNCTION_INVOCATION_FAILED`, Vercel request ID `sin1::brzhx-1792826817503-21d2ea31b401`.
 - Read-only `GET /ready`: **HTTP 500**, `FUNCTION_INVOCATION_FAILED`, Vercel request ID `sin1::w5m9q-1792826818050-42698c9a8c56`.
