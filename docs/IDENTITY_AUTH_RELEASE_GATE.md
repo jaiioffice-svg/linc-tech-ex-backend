@@ -119,6 +119,8 @@ The documentation-only review update is on [PR #19](https://github.com/jaiioffic
 - `/health`: HTTP 500, `FUNCTION_INVOCATION_FAILED`, Vercel request ID `sin1::9cd9s-1792823080229-09309f64f76a`.
 - `/ready`: HTTP 500, `FUNCTION_INVOCATION_FAILED`, Vercel request ID `sin1::6fv4d-1792823081490-605771d49d70`.
 
+- A second read-only recheck at **2026-10-24 07:07 UTC (14:07 Thailand time)** still returned HTTP 500 `FUNCTION_INVOCATION_FAILED`: `/health` request ID `sin1::5mmlc-1792825657302-286793520f49`; `/ready` request ID `sin1::5hmln-1792825658547-71b9b802b222`.
+
 The affected Production deployment reports READY at the build/deployment level, but targets `main` commit [`336e2fcdd1b9f0841432817dcafe955b45700eef`](https://github.com/jaiioffice-svg/linc-tech-ex-backend/commit/336e2fcdd1b9f0841432817dcafe955b45700eef). A READY deployment is not proof that the function runs correctly.
 
 ### Root cause evidence
