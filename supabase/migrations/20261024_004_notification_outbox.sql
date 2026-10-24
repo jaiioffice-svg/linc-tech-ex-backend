@@ -46,6 +46,7 @@ declare
 begin
     if p_user_id is null
        or btrim(p_user_id) = ''
+       or p_user_id <> btrim(p_user_id)
        or length(p_user_id) > 200 then
         raise exception 'invalid user identifier'
             using errcode = '22023';
