@@ -9,8 +9,13 @@ async function applyMigrations(database) {
         'CREATE ROLE anon; CREATE ROLE authenticated; CREATE ROLE service_role;'
     );
 
+    // Execute the complete Candidate migration chain in chronological order.
+    // This catches conflicts between historical repair migrations and the
+    // newer replay-protection/outbox migrations before any real project is touched.
     for (const filename of [
         '20261022_002_linc_core.sql',
+        '20261022_003_defer_heartbeat.sql',
+        '20261023_004_repair_service_role_grants.sql',
         '20261024_003_auth_assertion_replay.sql',
         '20261024_004_notification_outbox.sql'
     ]) {
