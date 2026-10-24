@@ -8,7 +8,7 @@ function validateApiKey(req, res, next) {
         typeof configuredKey !== 'string' ||
         Buffer.byteLength(configuredKey, 'utf8') < 32 ||
         configuredKey !== configuredKey.trim() ||
-        /[\\x00-\\x1F\\x7F]/.test(configuredKey)
+        /[\x00-\x1F\x7F]/.test(configuredKey)
     ) {
         return res.status(503).json({ success: false, message: 'API authentication is not configured' });
     }
