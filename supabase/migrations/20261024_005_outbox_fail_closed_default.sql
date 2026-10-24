@@ -5,14 +5,14 @@
 alter table public.linc_notification_outbox
     alter column event_status set default 'blocked';
 
--- Normalize only contradictory blocked/pending records before enforcing the rule.
--- Events without a verified recipient cannot be dispatched; any blocked event
--- must also have no recipient.
+-- Normalize non-terminal statuses with no recipient and clear recipients from
+-- blocked rows. Preserve terminal sent/dead labels here; migration 006 clears all
+-- stored recipients and disables dispatchable states until pairing is implemented.
 update public.linc_notification_outbox
    set event_status = 'blocked',
        recipient_line_id = null
  where recipient_line_id is null
-   and event_status <> 'blocked';
+   and event_status not in ('blocked', 'sent', 'dead');
 
 update public.linc_notification_outbox
    set recipient_line_id = null
