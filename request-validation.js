@@ -17,6 +17,16 @@ function validateUserRequest(req, res, next) {
         );
     }
 
+    const allowedFields = new Set(['userId', 'grade']);
+    const unsupportedField = Object.keys(body).find(key => !allowedFields.has(key));
+    if (unsupportedField !== undefined) {
+        return invalidRequest(
+            res,
+            'UNSUPPORTED_FIELD',
+            'Request contains an unsupported field'
+        );
+    }
+
     if (body.userId !== undefined) {
         if (
             typeof body.userId !== 'string' ||
