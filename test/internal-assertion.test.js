@@ -78,7 +78,8 @@ async function run(token, options = {}) {
     const req = mockRequest(token, options.request || {});
     const res = mockResponse();
     let nextCalled = false;
-    await withSecret(options.secret === undefined ? SECRET : options.secret, async () => {
+    const secret = Object.prototype.hasOwnProperty.call(options, 'secret') ? options.secret : SECRET;
+    await withSecret(secret, async () => {
         authenticateInternalAssertion(req, res, () => {
             nextCalled = true;
         });
@@ -136,8 +137,10 @@ test('opaque bearer token alone is not accepted as an internal assertion', async
 });
 
 test('invalid signature is rejected without exposing assertion contents', async () => {
-    const token = signAssertion().slice(0, -1) + 'A';
-    const result = await run(token);
+    const parts = signAssertion().split('.');
+    const replacement = parts[2][0] === 'A' ? 'B' : 'A';
+    parts[2] = replacement + parts[2].slice(1);
+    const result = await run(parts.join('.'));
     assert.equal(result.res.statusCode, 401);
     assert.equal(result.nextCalled, false);
     assert.equal(JSON.stringify(result.res.body).includes('verified-user-123'), false);
