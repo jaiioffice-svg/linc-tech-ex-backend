@@ -159,5 +159,5 @@ test('controller rejects cross-account profile claiming before database access',
 
     assert.equal(res.statusCode, 403);
     assert.equal(res.body.message, 'Requested user does not match authenticated identity');
-    assert.equal(fs.existsSync(process.env.LINC_DATA_FILE), false);
+    assert.equal(Object.hasOwn(readState().users, 'account-b'), false);
 });
