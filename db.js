@@ -49,6 +49,14 @@ function toEpochMilliseconds(value) {
     return Number.isNaN(date.getTime()) ? null : date.getTime();
 }
 
+// Strictly encode punctuation that encodeURIComponent leaves unescaped.
+// User IDs are untrusted input and must remain a single PostgREST filter value.
+function encodePostgrestFilterValue(value) {
+    return encodeURIComponent(String(value)).replace(/[!'()*]/g, character =>
+        `%${character.charCodeAt(0).toString(16).toUpperCase()}`
+    );
+}
+
 function normalizeSupabaseUser(row) {
     return {
         userId: row.user_id,
@@ -178,7 +186,7 @@ async function getUser(userId) {
     }
 
     const rows = await supabaseRequest(
-        `${SUPABASE_TABLE}?user_id=eq.${encodeURIComponent(userId)}&select=user_id,grade,guardian_line_id,created_at,last_heartbeat,status&limit=1`
+        `${SUPABASE_TABLE}?user_id=eq.${encodePostgrestFilterValue(userId)}&select=user_id,grade,guardian_line_id,created_at,last_heartbeat,status&limit=1`
     );
     return rows.length ? normalizeSupabaseUser(rows[0]) : null;
 }
