@@ -31,7 +31,7 @@ The Backend takes the user ID from the signed `sub` claim. A body-supplied `user
 | POST `/api/v1/heartbeat` | Record a heartbeat for the verified user | Optional `userId` consistency check; optional `grade` string up to 32 characters. | HTTP 201 when it creates a missing profile; HTTP 200 when it updates an existing profile, with `{ "success": true, "message": "Heartbeat acknowledged" }`. |
 | POST `/api/v1/alert/delete` | Record an app-termination/deletion event for the verified user | Optional `userId` consistency check. | HTTP 200 with `success`, `alreadyRecorded`, `notificationStatus` and a message; HTTP 404 if the target profile does not exist. |
 
-No client-supplied `guardianLineId`, nested `auth` object, or other request property can establish the authenticated user or verified guardian identity. Do not rely on unknown request properties being rejected; controllers must only use explicitly handled fields.
+Only `userId` and `grade` are supported request fields on these protected routes. Any other field, including client-supplied `guardianLineId`, nested `auth`, `role`, or `isAdmin`, is rejected with HTTP 400 (`UNSUPPORTED_FIELD`). Even if a handler is called directly, controllers must not use request-supplied fields to establish the authenticated user or verified guardian identity.
 
 ### App-termination notification semantics
 
@@ -56,7 +56,7 @@ Never tell the user or guardian that a message was sent merely because the API r
 
 | HTTP status | Example code/message | Meaning |
 |---:|---|---|
-| 400 | `INVALID_JSON`, `INVALID_BODY`, `INVALID_USER_ID`, `INVALID_GRADE` | Request JSON or supported field shape is invalid. |
+| 400 | `INVALID_JSON`, `INVALID_BODY`, `INVALID_USER_ID`, `INVALID_GRADE`, `UNSUPPORTED_FIELD` | Request JSON or supported field shape is invalid. |
 | 401 | `Unauthorized connection` | Request service-key header is missing/incorrect, or the signed assertion is missing/invalid/expired/replayed. |
 | 403 | `Requested user does not match authenticated identity` | Request body user ID differs from the signed subject. |
 | 404 | `Target profile not found` | No profile exists for the authenticated subject when deletion is recorded. |
