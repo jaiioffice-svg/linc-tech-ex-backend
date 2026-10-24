@@ -81,7 +81,7 @@ function supabaseBaseUrl() {
     const standardSupabaseHost =
         hostname.endsWith('.supabase.co') &&
         hostname.length > '.supabase.co'.length;
-    const loopbackHost = ['localhost', '127.0.0.1', '::1'].includes(hostname);
+    const loopbackHost = ['localhost', '127.0.0.1', '::1', '[::1]'].includes(hostname);
     const allowedHttpsHost = parsed.protocol === 'https:' &&
         (!runningOnVercel || standardSupabaseHost);
     const allowedLocalHttp = !runningOnVercel &&
