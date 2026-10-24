@@ -26,7 +26,8 @@ Before applying SQL, review the target schema and confirm the project reference.
 2. `supabase/migrations/20261022_003_defer_heartbeat.sql` — keeps `last_heartbeat` nullable while automatic missing-heartbeat monitoring is deferred.
 3. `supabase/migrations/20261023_004_repair_service_role_grants.sql` — service-role schema/table grant repair for existing installations.
 4. `supabase/migrations/20261024_003_auth_assertion_replay.sql` — durable, one-time signed-assertion replay protection RPC.
-5. `supabase/migrations/20261024_004_notification_outbox.sql` — RLS-protected outbox and atomic app-termination recording RPC.
+5. `supabase/migrations/20261024_004_notification_outbox.sql` — RLS-protected outbox and atomic app-termination recording RPC; new tables default events to `blocked` and enforce recipient/status consistency.
+6. `supabase/migrations/20261024_005_outbox_fail_closed_default.sql` — upgrades a previously created outbox table to the fail-closed default, normalizes contradictory records without recipients, and adds the recipient/status constraint idempotently. Review the normalization of existing outbox rows before authorizing it.
 
 After each migration, verify success and inspect the resulting object/grant state before continuing. Do not run the separate `migrations/001_create_linc_app_state.sql` file: it belongs to an old local PostgreSQL prototype and is not used by the Supabase REST adapter.
 
