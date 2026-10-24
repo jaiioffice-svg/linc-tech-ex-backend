@@ -40,6 +40,18 @@ function assertCanonicalUserId(userId) {
     return userId;
 }
 
+const ALLOWED_USER_STATUSES = new Set(['active', 'missing', 'app_deleted']);
+
+function assertSupportedUserStatus(user) {
+    if (
+        user &&
+        user.status !== undefined &&
+        !ALLOWED_USER_STATUSES.has(user.status)
+    ) {
+        throw new TypeError('A valid user status is required');
+    }
+}
+
 function assertDatabaseAvailable() {
     if (hasSupabaseConfig()) return;
     if (process.env.VERCEL || process.env.VERCEL_ENV) {
@@ -279,6 +291,7 @@ async function getUser(userId) {
 
 async function saveUser(user) {
     assertCanonicalUserId(user && user.userId);
+    assertSupportedUserStatus(user);
     assertDatabaseAvailable();
 
     if (!hasSupabaseConfig()) {
