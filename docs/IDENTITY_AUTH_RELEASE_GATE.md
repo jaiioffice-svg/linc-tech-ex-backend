@@ -59,13 +59,13 @@ These tests prove behavior of the interim guard and controller logic; they do no
 ## Latest verified evidence — 2026-10-24
 
 ### Latest code/test verification
-- Latest reviewed branch head: [`684c5d18aeb6b4bf1bab663330fe59ac93fadc04`](https://github.com/jaiioffice-svg/linc-tech-ex-backend/commit/684c5d18aeb6b4bf1bab663330fe59ac93fadc04). Changes since runtime/test candidate `eedaa6c67c4911c44c6a13bed860020cd27a724a` affect tests, Vercel Git deployment behavior, and documentation only; no application Runtime JavaScript changed.
-- In the isolated Vercel Sandbox on exact commit `684c5d18aeb6b4bf1bab663330fe59ac93fadc04` (Node v24.22.1, npm 11.19.1):
+- Latest fully tested branch head before this release-gate documentation refresh: [`d594daa359ff6c9da6ab159253434ac8bcc878d8`](https://github.com/jaiioffice-svg/linc-tech-ex-backend/commit/d594daa359ff6c9da6ab159253434ac8bcc878d8). Changes since runtime/test candidate `eedaa6c67c4911c44c6a13bed860020cd27a724a` affect tests, Vercel Git deployment behavior, and documentation only; no application Runtime JavaScript changed.
+- In the isolated Vercel Sandbox on exact commit `d594daa359ff6c9da6ab159253434ac8bcc878d8` (Node v24.22.1, npm 11.19.1):
   - `npm ci --no-audit --no-fund`: PASS; 85 packages installed.
   - `npm test`: PASS; **36/36 tests**, 0 failed.
   - `npm audit`: PASS; **0 vulnerabilities across the full dependency tree**.
   - Vercel config JSON/scope validation and `git diff --check`: PASS; working tree clean.
-- GitHub Actions [Backend checks run #99](https://github.com/jaiioffice-svg/linc-tech-ex-backend/actions/runs/40068519568) succeeded for exact commit `684c5d1`; run [#97](https://github.com/jaiioffice-svg/linc-tech-ex-backend/actions/runs/40068453955) also succeeded for the previous test/config commit.
+- GitHub Actions [Backend checks run #101](https://github.com/jaiioffice-svg/linc-tech-ex-backend/actions/runs/40068639267) succeeded for exact commit `d594daa`; run [#99](https://github.com/jaiioffice-svg/linc-tech-ex-backend/actions/runs/40068519568) also succeeded for the previous docs head.
 - Added `test/api-route-security.test.js`: requires every direct Express route under `/api/v1/` to run `validateApiKey` then `requireVerifiedEndUser`, and fails closed if an uninspected nested router is mounted.
 - Added `test/vercel-config.test.js`: protects the Vercel branch-pause setting and confirms the existing Express build/routes remain configured.
 
