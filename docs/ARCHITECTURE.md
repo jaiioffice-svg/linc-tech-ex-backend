@@ -159,3 +159,11 @@ The protected registration, heartbeat and app-delete routes now run `validateUse
 Regression tests in `test/request-validation.test.js` cover missing/null/array bodies, malformed or oversized user IDs, invalid grades and a valid request shape. On Candidate commit `5a1ae892f37df094fddd65666d397cb7325431b5`, isolated Sandbox checks passed **49/49 tests**, `npm audit` reported 0 vulnerabilities, all four backend JavaScript entry/middleware files passed `node --check`, Vercel config/scope and `git diff --check` passed, and GitHub Actions [run #175](https://github.com/jaiioffice-svg/linc-tech-ex-backend/actions/runs/40077023815) succeeded.
 
 This is request-shape validation only; the approved Client session contract and the production end-user identity verifier remain unresolved.
+
+
+
+## 14. Supabase response-shape validation and latest test evidence — 2026-10-24
+
+The Supabase adapter now rejects a nominally successful response unless the user-query payload is an array of row objects with string `user_id` values. Readiness does not accept malformed row arrays as proof that the database is ready. This avoids a raw `TypeError` when a proxy, endpoint or mock returns a JSON object rather than PostgREST's expected array.
+
+New regression test in `test/db.test.js` returns a valid HTTP 200 with an object instead of a row array and asserts a generic `DB_UNAVAILABLE` result, then verifies readiness treats the malformed shape as unavailable. Exact Runtime/test commit `b779f254ae7023131df042eb181804f803cc3769` passed **51/51 tests** in a fresh isolated Sandbox, `npm ci` installed 85 packages, `npm audit` reported 0 vulnerabilities, backend `node --check` tests passed, Vercel config/scope checks and `git diff --check` passed. GitHub Actions [run #189](https://github.com/jaiioffice-svg/linc-tech-ex-backend/actions/runs/40077335065) succeeded.
