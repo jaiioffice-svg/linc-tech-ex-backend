@@ -4,7 +4,7 @@ const fs = require('node:fs');
 
 const dbPath = require.resolve('../db');
 
-function withEnv(values, callback) {
+async function withEnv(values, callback) {
     const previous = {};
     for (const [key, value] of Object.entries(values)) {
         previous[key] = process.env[key];
@@ -12,7 +12,7 @@ function withEnv(values, callback) {
         else process.env[key] = value;
     }
     try {
-        return callback();
+        return await callback();
     } finally {
         for (const [key, value] of Object.entries(previous)) {
             if (value === undefined) delete process.env[key];
