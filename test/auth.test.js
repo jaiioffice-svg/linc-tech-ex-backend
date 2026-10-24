@@ -32,7 +32,7 @@ test('returns 503 when API key is not configured', () => {
 
 test('returns 401 when request has no API key', () => {
     const previous = process.env.LINC_API_KEY;
-    process.env.LINC_API_KEY = 'test-only-key';
+    process.env.LINC_API_KEY = 'test-only-api-key-that-is-definitely-over-32-bytes';
     try {
         const res = mockResponse();
         let nextCalled = false;
@@ -47,7 +47,7 @@ test('returns 401 when request has no API key', () => {
 
 test('returns 401 when request API key is incorrect', () => {
     const previous = process.env.LINC_API_KEY;
-    process.env.LINC_API_KEY = 'test-only-key';
+    process.env.LINC_API_KEY = 'test-only-api-key-that-is-definitely-over-32-bytes';
     try {
         const res = mockResponse();
         let nextCalled = false;
@@ -62,11 +62,11 @@ test('returns 401 when request API key is incorrect', () => {
 
 test('calls next when request API key matches', () => {
     const previous = process.env.LINC_API_KEY;
-    process.env.LINC_API_KEY = 'test-only-key';
+    process.env.LINC_API_KEY = 'test-only-api-key-that-is-definitely-over-32-bytes';
     try {
         const res = mockResponse();
         let nextCalled = false;
-        validateApiKey(mockRequest('test-only-key'), res, () => { nextCalled = true; });
+        validateApiKey(mockRequest('test-only-api-key-that-is-definitely-over-32-bytes'), res, () => { nextCalled = true; });
         assert.equal(nextCalled, true);
         assert.equal(res.statusCode, 200);
         assert.equal(res.body, null);
@@ -106,4 +106,20 @@ test('end-user route gate accepts a verified principal when request contains no 
     }, res, () => { nextCalled = true; });
     assert.equal(res.statusCode, 200);
     assert.equal(nextCalled, true);
+});
+
+test('returns 503 when configured API key is shorter than the minimum length', () => {
+    const previous = process.env.LINC_API_KEY;
+    process.env.LINC_API_KEY = 'too-short';
+    try {
+        const res = mockResponse();
+        let nextCalled = false;
+        validateApiKey(mockRequest('too-short'), res, () => { nextCalled = true; });
+        assert.equal(res.statusCode, 503);
+        assert.equal(res.body.message, 'API authentication is not configured');
+        assert.equal(nextCalled, false);
+    } finally {
+        if (previous === undefined) delete process.env.LINC_API_KEY;
+        else process.env.LINC_API_KEY = previous;
+    }
 });
