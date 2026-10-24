@@ -123,3 +123,21 @@ test('database diagnostic messages remove control characters and preserve safe e
         }
     );
 });
+
+test('getUser strictly encodes punctuation in untrusted PostgREST filter values', async t => {
+    setTestEnvironment(t);
+    const previousFetch = global.fetch;
+    t.after(() => { global.fetch = previousFetch; });
+    let requestedUrl = '';
+    global.fetch = async url => {
+        requestedUrl = String(url);
+        return new Response('[]', {
+            status: 200,
+            headers: { 'content-type': 'application/json' }
+        });
+    };
+
+    await loadDb().getUser("attacker')or(status.eq.active");
+    assert.match(requestedUrl, /user_id=eq\.attacker%27%29or%28status\.eq\.active/);
+    assert.doesNotMatch(requestedUrl, /user_id=eq\.attacker'\)or\(/);
+});
