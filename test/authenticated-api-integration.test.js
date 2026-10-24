@@ -53,6 +53,7 @@ function createAssertion({ scope = '/api/v1/users/register', sub = USER_ID, jti 
 
 test('authenticated registration API integration with isolated Supabase boundary', async t => {
     const calls = [];
+    const terminationCalls = new Map();
     global.fetch = async (input, options = {}) => {
         const url = new URL(String(input));
         if (url.origin !== SUPABASE_ORIGIN) return nativeFetch(input, options);
@@ -64,6 +65,47 @@ test('authenticated registration API integration with isolated Supabase boundary
             headers: options.headers || {},
             body: options.body ? JSON.parse(options.body) : null
         });
+
+        if (url.pathname.endsWith('/rpc/linc_record_app_termination')) {
+            const userId = JSON.parse(options.body || '{}').p_user_id;
+            if (userId === 'missing-user') {
+                return new Response(JSON.stringify({
+                    found: false,
+                    alreadyRecorded: false,
+                    eventId: null,
+                    eventStatus: null,
+                    guardianLinked: false,
+                    deletedAt: null
+                }), {
+                    status: 200,
+                    headers: { 'content-type': 'application/json' }
+                });
+            }
+
+            const previousCount = terminationCalls.get(userId) || 0;
+            terminationCalls.set(userId, previousCount + 1);
+            const result = previousCount > 0
+                ? {
+                    found: true,
+                    alreadyRecorded: true,
+                    eventId: null,
+                    eventStatus: null,
+                    guardianLinked: false,
+                    deletedAt: null
+                }
+                : {
+                    found: true,
+                    alreadyRecorded: false,
+                    deletedAt: 1792831500000,
+                    eventId: '7d2c45b6-1f54-4cbb-9f85-41ac69f6a1d2',
+                    eventStatus: 'blocked',
+                    guardianLinked: false
+                };
+            return new Response(JSON.stringify(result), {
+                status: 200,
+                headers: { 'content-type': 'application/json' }
+            });
+        }
 
         if (url.pathname.endsWith('/rpc/linc_consume_auth_assertion')) {
             return new Response('true', {
@@ -242,6 +284,117 @@ test('authenticated registration API integration with isolated Supabase boundary
             message: 'Requested user does not match authenticated identity'
         });
         assert.equal(calls.length, before);
+    });
+
+    await t.test('delete route rejects a client-supplied guardian identity before recording an outbox event', async () => {
+        const before = calls.length;
+        const denied = await nativeFetch(`${baseUrl}/api/v1/alert/delete`, {
+            method: 'POST',
+            headers: {
+                'content-type': 'application/json',
+                'x-linc-api-key': API_KEY,
+                'x-linc-user-assertion': createAssertion({
+                    scope: '/api/v1/alert/delete',
+                    jti: 'test-assertion-id-000006'
+                })
+            },
+            body: JSON.stringify({
+                userId: USER_ID,
+                guardianLineId: 'unverified-client-line-id'
+            })
+        });
+        assert.equal(denied.status, 400);
+        assert.deepEqual(await denied.json(), {
+            success: false,
+            code: 'UNSUPPORTED_FIELD',
+            message: 'Request contains an unsupported field'
+        });
+        assert.equal(calls.length - before, 1);
+        assert.match(calls[before].path, /\\/rpc\\/linc_consume_auth_assertion$/);
+        assert.equal(calls.some(call => call.path.endsWith('/rpc/linc_record_app_termination')), false);
+    });
+
+    await t.test('delete route records a blocked event and never dispatches a LINE message', async () => {
+        const before = calls.length;
+        const response = await nativeFetch(`${baseUrl}/api/v1/alert/delete`, {
+            method: 'POST',
+            headers: {
+                'content-type': 'application/json',
+                'x-linc-api-key': API_KEY,
+                'x-linc-user-assertion': createAssertion({
+                    scope: '/api/v1/alert/delete',
+                    jti: 'test-assertion-id-000007'
+                })
+            },
+            body: JSON.stringify({ userId: USER_ID })
+        });
+        assert.equal(response.status, 200);
+        assert.deepEqual(await response.json(), {
+            success: true,
+            alreadyRecorded: false,
+            notificationStatus: 'blocked',
+            message: 'Termination event recorded'
+        });
+
+        const newCalls = calls.slice(before);
+        assert.equal(newCalls.length, 2);
+        assert.match(newCalls[0].path, /\\/rpc\\/linc_consume_auth_assertion$/);
+        assert.match(newCalls[1].path, /\\/rpc\\/linc_record_app_termination$/);
+        assert.deepEqual(newCalls[1].body, { p_user_id: USER_ID });
+        assert.equal(newCalls.every(call => call.path.includes('/rpc/linc_')), true);
+    });
+
+    await t.test('repeated delete reports already_recorded without trying to dispatch', async () => {
+        const before = calls.length;
+        const response = await nativeFetch(`${baseUrl}/api/v1/alert/delete`, {
+            method: 'POST',
+            headers: {
+                'content-type': 'application/json',
+                'x-linc-api-key': API_KEY,
+                'x-linc-user-assertion': createAssertion({
+                    scope: '/api/v1/alert/delete',
+                    jti: 'test-assertion-id-000008'
+                })
+            },
+            body: JSON.stringify({ userId: USER_ID })
+        });
+        assert.equal(response.status, 200);
+        assert.deepEqual(await response.json(), {
+            success: true,
+            alreadyRecorded: true,
+            notificationStatus: 'already_recorded',
+            message: 'Termination event already recorded'
+        });
+        const newCalls = calls.slice(before);
+        assert.equal(newCalls.length, 2);
+        assert.match(newCalls[1].path, /\\/rpc\\/linc_record_app_termination$/);
+        assert.equal(newCalls.every(call => call.path.includes('/rpc/linc_')), true);
+    });
+
+    await t.test('delete route reports a missing profile without emitting an outbox event', async () => {
+        const before = calls.length;
+        const response = await nativeFetch(`${baseUrl}/api/v1/alert/delete`, {
+            method: 'POST',
+            headers: {
+                'content-type': 'application/json',
+                'x-linc-api-key': API_KEY,
+                'x-linc-user-assertion': createAssertion({
+                    scope: '/api/v1/alert/delete',
+                    sub: 'missing-user',
+                    jti: 'test-assertion-id-000009'
+                })
+            },
+            body: JSON.stringify({ userId: 'missing-user' })
+        });
+        assert.equal(response.status, 404);
+        assert.deepEqual(await response.json(), {
+            success: false,
+            message: 'Target profile not found'
+        });
+        const newCalls = calls.slice(before);
+        assert.equal(newCalls.length, 2);
+        assert.match(newCalls[1].path, /\\/rpc\\/linc_record_app_termination$/);
+        assert.equal(newCalls.every(call => call.path.includes('/rpc/linc_')), true);
     });
 });
 
