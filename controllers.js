@@ -8,7 +8,7 @@ function sendError(res, error, action) {
         ? 'Required database service is not configured or is temporarily unavailable'
         : 'Internal server error';
     return res.status(status).json({ success: false, message });
-};
+}
 
 exports.handleUserRegistration = async (req, res) => {
     try {
@@ -46,7 +46,7 @@ exports.handleUserRegistration = async (req, res) => {
 // Keep the existing mobile-app heartbeat endpoint while using Supabase persistence.
 exports.handleHeartbeat = async (req, res) => {
     try {
-        const { userId, grade, guardianLineId } = req.body || {};
+        const { userId, grade } = req.body || {};
         if (typeof userId !== 'string' || !userId.trim()) {
             return res.status(400).json({ success: false, message: 'Missing core identifier' });
         }
@@ -88,6 +88,9 @@ exports.handleImmediateDelete = async (req, res, triggerAlertCallback) => {
         const { userId } = req.body || {};
         if (typeof userId !== 'string' || !userId.trim()) {
             return res.status(400).json({ success: false, message: 'Missing core identifier' });
+        }
+        if (userId.length > 200) {
+            return res.status(400).json({ success: false, message: 'Invalid user identifier' });
         }
 
         const targetUser = await getUser(userId);
