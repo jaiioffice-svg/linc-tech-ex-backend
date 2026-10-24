@@ -4,7 +4,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { PGlite } = require('@electric-sql/pglite');
 
-async function applyMigrations(database) {
+async function applyMigrations(database, options = {}) {
     await database.exec(
         'CREATE ROLE anon; CREATE ROLE authenticated; CREATE ROLE service_role;'
     );
@@ -18,7 +18,8 @@ async function applyMigrations(database) {
         '20261023_004_repair_service_role_grants.sql',
         '20261024_003_auth_assertion_replay.sql',
         '20261024_004_notification_outbox.sql',
-        '20261024_005_outbox_fail_closed_default.sql'
+        '20261024_005_outbox_fail_closed_default.sql',
+        ...(options.includeDispatchDisable === false ? [] : ['20261024_006_disable_unverified_outbox_dispatch.sql'])
     ]) {
         const fullPath = path.join(__dirname, '..', 'supabase', 'migrations', filename);
         await database.exec(fs.readFileSync(fullPath, 'utf8'));
@@ -135,32 +136,35 @@ test('outbox defaults to blocked and database constraints prevent status-recipie
         assert.equal(defaulted.rows[0].event_status, 'blocked');
         assert.equal(defaulted.rows[0].recipient_line_id, null);
 
-        await assert.rejects(
-            database.query(
-                "INSERT INTO public.linc_notification_outbox (user_id, event_type, event_status, recipient_line_id) VALUES ($1, 'APP_TERMINATION_SIGNAL', 'pending', NULL)",
-                ['constraint-user']
-            ),
-            error => error && error.code === '23514'
-        );
+        for (const [status, recipient] of [
+            ['pending', null],
+            ['pending', 'unverified-test-recipient'],
+            ['processing', 'unverified-test-recipient'],
+            ['retry', 'unverified-test-recipient'],
+            ['blocked', 'unverified-test-recipient']
+        ]) {
+            await assert.rejects(
+                database.query(
+                    'INSERT INTO public.linc_notification_outbox (user_id, event_type, event_status, recipient_line_id) VALUES ($1, $2, $3, $4)',
+                    ['constraint-user', 'APP_TERMINATION_SIGNAL', status, recipient]
+                ),
+                error => error && error.code === '23514'
+            );
+        }
 
-        await assert.rejects(
-            database.query(
-                "INSERT INTO public.linc_notification_outbox (user_id, event_type, event_status, recipient_line_id) VALUES ($1, 'APP_TERMINATION_SIGNAL', 'blocked', 'unverified-line-id')",
-                ['constraint-user']
-            ),
-            error => error && error.code === '23514'
-        );
+        for (const status of ['sent', 'dead']) {
+            await database.query(
+                'INSERT INTO public.linc_notification_outbox (user_id, event_type, event_status, recipient_line_id) VALUES ($1, $2, $3, NULL)',
+                ['constraint-user', 'APP_TERMINATION_SIGNAL', status]
+            );
+        }
 
-        await database.query(
-            "INSERT INTO public.linc_notification_outbox (user_id, event_type, event_status, recipient_line_id) VALUES ($1, 'APP_TERMINATION_SIGNAL', 'pending', 'verified-test-recipient')",
+        const terminalHistory = await database.query(
+            "SELECT event_status, recipient_line_id FROM public.linc_notification_outbox WHERE user_id = $1 AND event_status IN ('sent', 'dead') ORDER BY event_status",
             ['constraint-user']
         );
-        const validPending = await database.query(
-            "SELECT event_status, recipient_line_id FROM public.linc_notification_outbox WHERE user_id = $1 AND event_status = 'pending'",
-            ['constraint-user']
-        );
-        assert.equal(validPending.rows.length, 1);
-        assert.equal(validPending.rows[0].recipient_line_id, 'verified-test-recipient');
+        assert.deepEqual(terminalHistory.rows.map(row => row.event_status), ['dead', 'sent']);
+        assert.equal(terminalHistory.rows.every(row => row.recipient_line_id === null), true);
     } finally {
         await database.close();
     }
@@ -212,60 +216,73 @@ test('termination RPC rejects blank, padded, and oversized user IDs', async () =
 });
 
 
-test('fail-closed outbox migration safely upgrades legacy pending events without recipients', async () => {
+test('dispatch-disable migration blocks every undelivered legacy event and clears outbox recipients', async () => {
     const database = new PGlite();
 
     try {
-        await applyMigrations(database);
+        await applyMigrations(database, { includeDispatchDisable: false });
         await seedUser(database, 'legacy-outbox-user', 'legacy-line-id');
 
-        // Simulate a previously installed schema that predates the new
-        // recipient/status constraint and still defaults omitted status to pending.
+        // Recreate a pre-guard table with the previous permissive status/recipient check.
         await database.exec(`
             ALTER TABLE public.linc_notification_outbox
                 DROP CONSTRAINT linc_notification_outbox_recipient_status_check;
             ALTER TABLE public.linc_notification_outbox
                 ALTER COLUMN event_status SET DEFAULT 'pending';
         `);
-        await database.query(
-            "INSERT INTO public.linc_notification_outbox (user_id, event_type, event_status, recipient_line_id) VALUES ($1, 'APP_TERMINATION_SIGNAL', 'pending', NULL)",
-            ['legacy-outbox-user']
-        );
-        await database.query(
-            "INSERT INTO public.linc_notification_outbox (user_id, event_type, event_status, recipient_line_id) VALUES ($1, 'APP_TERMINATION_SIGNAL', 'blocked', 'legacy-line-id')",
-            ['legacy-outbox-user']
-        );
+
+        for (const [status, recipient] of [
+            ['pending', null],
+            ['pending', 'legacy-pending-line-id'],
+            ['processing', 'legacy-processing-line-id'],
+            ['retry', 'legacy-retry-line-id'],
+            ['blocked', 'legacy-blocked-line-id'],
+            ['sent', 'historical-sent-line-id'],
+            ['dead', 'historical-dead-line-id']
+        ]) {
+            await database.query(
+                'INSERT INTO public.linc_notification_outbox (user_id, event_type, event_status, recipient_line_id) VALUES ($1, $2, $3, $4)',
+                ['legacy-outbox-user', 'APP_TERMINATION_SIGNAL', status, recipient]
+            );
+        }
 
         const migration = fs.readFileSync(
-            path.join(__dirname, '..', 'supabase', 'migrations', '20261024_005_outbox_fail_closed_default.sql'),
+            path.join(__dirname, '..', 'supabase', 'migrations', '20261024_006_disable_unverified_outbox_dispatch.sql'),
             'utf8'
         );
         await database.exec(migration);
-        // Re-running is safe and proves the constraint/default migration is idempotent.
+        // Re-running is safe and proves the migration is idempotent.
         await database.exec(migration);
 
         const rows = await database.query(
-            'SELECT event_status, recipient_line_id FROM public.linc_notification_outbox WHERE user_id = $1 ORDER BY created_at, event_id',
+            'SELECT event_status, recipient_line_id FROM public.linc_notification_outbox WHERE user_id = $1 ORDER BY event_status, event_id',
             ['legacy-outbox-user']
         );
-        assert.equal(rows.rows.length, 2);
-        for (const row of rows.rows) {
-            assert.equal(row.event_status, 'blocked');
-            assert.equal(row.recipient_line_id, null);
-        }
+        assert.equal(rows.rows.length, 7);
+        assert.deepEqual(rows.rows.map(row => row.event_status), [
+            'blocked', 'blocked', 'blocked', 'blocked', 'blocked', 'dead', 'sent'
+        ]);
+        assert.equal(rows.rows.every(row => row.recipient_line_id === null), true);
 
         const metadata = await database.query(
             "SELECT column_default FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'linc_notification_outbox' AND column_name = 'event_status'"
         );
         assert.match(metadata.rows[0].column_default, /blocked/);
 
-        await assert.rejects(
-            database.query(
-                "INSERT INTO public.linc_notification_outbox (user_id, event_type, event_status, recipient_line_id) VALUES ($1, 'APP_TERMINATION_SIGNAL', 'pending', NULL)",
-                ['legacy-outbox-user']
-            ),
-            error => error && error.code === '23514'
-        );
+        for (const [status, recipient] of [
+            ['pending', 'unverified-line-id'],
+            ['processing', 'unverified-line-id'],
+            ['retry', 'unverified-line-id'],
+            ['blocked', 'unverified-line-id']
+        ]) {
+            await assert.rejects(
+                database.query(
+                    'INSERT INTO public.linc_notification_outbox (user_id, event_type, event_status, recipient_line_id) VALUES ($1, $2, $3, $4)',
+                    ['legacy-outbox-user', 'APP_TERMINATION_SIGNAL', status, recipient]
+                ),
+                error => error && error.code === '23514'
+            );
+        }
     } finally {
         await database.close();
     }
