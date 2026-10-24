@@ -240,7 +240,9 @@ test('outbox upgrade migrations disable unverified dispatch, clear recipients, a
             ['retry', 'legacy-retry-line-id'],
             ['blocked', 'legacy-blocked-line-id'],
             ['sent', 'historical-sent-line-id'],
-            ['dead', 'historical-dead-line-id']
+            ['sent', null],
+            ['dead', 'historical-dead-line-id'],
+            ['dead', null]
         ]) {
             await database.query(
                 'INSERT INTO public.linc_notification_outbox (user_id, event_type, event_status, recipient_line_id, sent_at) VALUES ($1, $2, $3, $4, $5)',
@@ -272,9 +274,9 @@ test('outbox upgrade migrations disable unverified dispatch, clear recipients, a
             'SELECT event_status, recipient_line_id, sent_at IS NULL AS sent_at_is_null FROM public.linc_notification_outbox WHERE user_id = $1 ORDER BY event_status, event_id',
             ['legacy-outbox-user']
         );
-        assert.equal(rows.rows.length, 7);
+        assert.equal(rows.rows.length, 9);
         assert.deepEqual(rows.rows.map(row => row.event_status), [
-            'blocked', 'blocked', 'blocked', 'blocked', 'blocked', 'dead', 'sent'
+            'blocked', 'blocked', 'blocked', 'blocked', 'blocked', 'dead', 'dead', 'sent', 'sent'
         ]);
         assert.equal(rows.rows.every(row => row.recipient_line_id === null), true);
         for (const row of rows.rows) {
