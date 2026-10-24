@@ -66,7 +66,8 @@ test('Vercel rejects unsafe Supabase endpoint URLs before sending service creden
             'https://user:password@example-project.supabase.co',
             'https://example-project.supabase.co?token=unexpected',
             'https://example-project.supabase.co/unexpected-path',
-            'https://example-project.supabase.co/rest/v2'
+            'https://example-project.supabase.co/rest/v2',
+            'https://example-project.supabase.co:8443'
         ];
 
         for (const url of invalidUrls) {
@@ -93,9 +94,11 @@ test('Vercel rejects unsafe Supabase endpoint URLs before sending service creden
 test('Vercel accepts standard Supabase project URLs with an optional /rest/v1 suffix', async () => {
     const originalFetch = global.fetch;
     let requestedUrl = '';
+    let capturedOptions;
 
-    global.fetch = async url => {
+    global.fetch = async (url, options) => {
         requestedUrl = String(url);
+        capturedOptions = options;
         return new Response('[]', {
             status: 200,
             headers: { 'content-type': 'application/json' }
@@ -117,6 +120,45 @@ test('Vercel accepts standard Supabase project URLs with an optional /rest/v1 su
             requestedUrl,
             'https://example-project.supabase.co/rest/v1/linc_users?select=user_id&limit=1'
         );
+        assert.equal(capturedOptions.redirect, 'error', 'authenticated requests must never follow redirects');
+    } finally {
+        global.fetch = originalFetch;
+    }
+});
+
+
+test('local development allows HTTP only for loopback Supabase endpoints', async () => {
+    const originalFetch = global.fetch;
+    let capturedUrl = '';
+    global.fetch = async url => {
+        capturedUrl = String(url);
+        return new Response('[]', {
+            status: 200,
+            headers: { 'content-type': 'application/json' }
+        });
+    };
+
+    try {
+        await withEnvAsync({
+            SUPABASE_URL: 'http://127.0.0.1:54321/rest/v1',
+            SUPABASE_SERVICE_ROLE_KEY: 'local-test-only-key',
+            VERCEL: undefined,
+            VERCEL_ENV: undefined
+        }, async () => {
+            assert.equal(isDatabaseConfigured(), true);
+            assert.equal(await checkDatabaseConnection(), true);
+        });
+        assert.equal(capturedUrl, 'http://127.0.0.1:54321/rest/v1/linc_users?select=user_id&limit=1');
+
+        await withEnvAsync({
+            SUPABASE_URL: 'http://attacker.example',
+            SUPABASE_SERVICE_ROLE_KEY: 'local-test-only-key',
+            VERCEL: undefined,
+            VERCEL_ENV: undefined
+        }, async () => {
+            assert.equal(isDatabaseConfigured(), false);
+            await assert.rejects(checkDatabaseConnection(), error => error && error.code === 'DB_NOT_CONFIGURED');
+        });
     } finally {
         global.fetch = originalFetch;
     }
@@ -162,6 +204,7 @@ test('new Supabase secret API keys are sent as apikey, not as a Bearer JWT', asy
         assert.equal(await checkDatabaseConnection(), true);
         assert.equal(capturedOptions.headers.apikey, 'sb_secret_test-only');
         assert.equal(Object.hasOwn(capturedOptions.headers, 'Authorization'), false);
+        assert.equal(capturedOptions.redirect, 'error', 'authenticated requests must reject redirects by default');
     } finally {
         global.fetch = previousFetch;
         for (const [key, value] of Object.entries(previousEnv)) {
