@@ -70,7 +70,7 @@ test('getUser reads a profile from Supabase REST', async () => {
             created_at: 123,
             last_heartbeat: null,
             status: 'active',
-            data: { userId: 'test-user', nickname: 'Preview Test' }
+            data: { userId: 'test-user', nickname: 'Preview Test', guardianLineId: 'stale-untrusted-guardian' }
         }]), { status: 200, headers: { 'content-type': 'application/json' } });
     };
     try {
@@ -84,6 +84,7 @@ test('getUser reads a profile from Supabase REST', async () => {
             assert.equal(user.userId, 'test-user');
             assert.equal(user.grade, 'M2');
             assert.equal(user.nickname, 'Preview Test');
+            assert.equal(user.guardianLineId, null);
             assert.match(requestUrl, /\/rest\/v1\/linc_users\?/);
             assert.equal(requestOptions.method, undefined);
             assert.equal(requestOptions.headers.apikey, 'sb_secret_test_only');
