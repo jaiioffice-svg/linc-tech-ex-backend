@@ -52,6 +52,7 @@ Never tell the user or guardian that a message was sent merely because the API r
 - User ID, when present, must be a non-empty string of no more than 200 characters.
 - Grade, when present, must be a string of no more than 32 characters. The current API does not enforce an M1–M6 enum.
 - CORS grants browser access only to exact valid origins listed in `LINC_ALLOWED_ORIGINS`. CORS is not authentication.
+- A distributed rate limiter is **not** implemented in this Candidate. Do not assume that HTTP 429 protection exists; add a shared-store rate limiter and abuse thresholds before exposing sensitive routes broadly. A per-instance in-memory limiter would not be a reliable serverless control.
 
 | HTTP status | Example code/message | Meaning |
 |---:|---|---|
