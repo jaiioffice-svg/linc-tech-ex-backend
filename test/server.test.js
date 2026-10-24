@@ -246,7 +246,7 @@ test('registration cannot spoof req.auth by nesting an auth object in JSON body'
 });
 
 test('protected route enforces signed BFF assertions, route scope, and verified identity before database access', async () => {
-    const serviceKey = 'test-only-service-key';
+    const serviceKey = 'test-only-api-key-that-is-definitely-over-32-bytes';
     const secret = 'test-only-internal-auth-secret-1234567890';
     const validAssertion = makeInternalAssertion({ secret });
 
