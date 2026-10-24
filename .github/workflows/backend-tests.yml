@@ -2,19 +2,7 @@ name: Backend tests
 
 on:
   push:
-    branches:
-      - main
-      - fix/vercel-readonly-filesystem
-      - fix/heartbeat-guardian-security
-      - fix/supabase-readiness-diagnostics
-      - docs/identity-security-contract
   pull_request:
-    branches:
-      - main
-      - fix/vercel-readonly-filesystem
-      - fix/heartbeat-guardian-security
-      - fix/supabase-readiness-diagnostics
-      - docs/identity-security-contract
 
 jobs:
   test:
