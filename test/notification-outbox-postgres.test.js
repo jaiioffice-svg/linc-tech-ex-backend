@@ -243,8 +243,14 @@ test('outbox upgrade migrations disable unverified dispatch, clear recipients, a
             ['dead', 'historical-dead-line-id']
         ]) {
             await database.query(
-                'INSERT INTO public.linc_notification_outbox (user_id, event_type, event_status, recipient_line_id) VALUES ($1, $2, $3, $4)',
-                ['legacy-outbox-user', 'APP_TERMINATION_SIGNAL', status, recipient]
+                'INSERT INTO public.linc_notification_outbox (user_id, event_type, event_status, recipient_line_id, sent_at) VALUES ($1, $2, $3, $4, $5)',
+                [
+                    'legacy-outbox-user',
+                    'APP_TERMINATION_SIGNAL',
+                    status,
+                    recipient,
+                    new Date('2026-01-01T00:00:00.000Z')
+                ]
             );
         }
 
@@ -263,7 +269,7 @@ test('outbox upgrade migrations disable unverified dispatch, clear recipients, a
         await database.exec(disableDispatchMigration);
 
         const rows = await database.query(
-            'SELECT event_status, recipient_line_id FROM public.linc_notification_outbox WHERE user_id = $1 ORDER BY event_status, event_id',
+            'SELECT event_status, recipient_line_id, sent_at IS NULL AS sent_at_is_null FROM public.linc_notification_outbox WHERE user_id = $1 ORDER BY event_status, event_id',
             ['legacy-outbox-user']
         );
         assert.equal(rows.rows.length, 7);
@@ -271,6 +277,13 @@ test('outbox upgrade migrations disable unverified dispatch, clear recipients, a
             'blocked', 'blocked', 'blocked', 'blocked', 'blocked', 'dead', 'sent'
         ]);
         assert.equal(rows.rows.every(row => row.recipient_line_id === null), true);
+        for (const row of rows.rows) {
+            if (row.event_status === 'blocked') {
+                assert.equal(row.sent_at_is_null, true, 'blocked/undelivered events must not retain a sent timestamp');
+            } else {
+                assert.equal(row.sent_at_is_null, false, 'terminal audit rows retain their historical timestamp');
+            }
+        }
 
         const metadata = await database.query(
             "SELECT column_default FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'linc_notification_outbox' AND column_name = 'event_status'"
