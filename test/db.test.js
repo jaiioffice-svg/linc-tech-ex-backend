@@ -329,8 +329,8 @@ test('recordAppTermination calls the atomic Supabase RPC and validates its resul
         alreadyRecorded: false,
         deletedAt: 1792831500000,
         eventId: '7d2c45b6-1f54-4cbb-9f85-41ac69f6a1d2',
-        eventStatus: 'pending',
-        guardianLinked: true
+        eventStatus: 'blocked',
+        guardianLinked: false
     };
 
     global.fetch = async (url, options) => {
@@ -359,6 +359,39 @@ test('recordAppTermination calls the atomic Supabase RPC and validates its resul
                 p_user_id: 'delete-user'
             });
             assert.ok(requestOptions.signal instanceof AbortSignal);
+        });
+    } finally {
+        global.fetch = originalFetch;
+    }
+});
+
+test('recordAppTermination rejects a pending event backed only by an unverified guardian ID', async () => {
+    const db = require('../db');
+    const originalFetch = global.fetch;
+
+    global.fetch = async () => new Response(JSON.stringify({
+        found: true,
+        alreadyRecorded: false,
+        deletedAt: 1792831500000,
+        eventId: '7d2c45b6-1f54-4cbb-9f85-41ac69f1a1d2',
+        eventStatus: 'pending',
+        guardianLinked: true
+    }), {
+        status: 200,
+        headers: { 'content-type': 'application/json' }
+    });
+
+    try {
+        await withEnv({
+            VERCEL: '1',
+            VERCEL_ENV: 'preview',
+            SUPABASE_URL: 'https://example-project.supabase.co',
+            SUPABASE_SERVICE_ROLE_KEY: 'sb_secret_test_only'
+        }, async () => {
+            await assert.rejects(
+                db.recordAppTermination('delete-user'),
+                error => error.code === 'DB_UNAVAILABLE'
+            );
         });
     } finally {
         global.fetch = originalFetch;

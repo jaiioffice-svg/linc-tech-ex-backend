@@ -91,14 +91,14 @@ test('heartbeat never trusts a guardian LINE ID supplied for a newly created pro
     assert.equal(readState().users['heartbeat-user'].guardianLineId, null);
 });
 
-test('immediate-delete alert uses the authenticated profile and stored guardian ID', async () => {
+test('immediate-delete never trusts legacy guardian ID without verified pairing and consent', async () => {
     fs.writeFileSync(process.env.LINC_DATA_FILE, JSON.stringify({
         schools: {},
         users: {
             'delete-user': {
                 userId: 'delete-user',
                 grade: 'M1',
-                guardianLineId: 'verified-stored-line-id',
+                guardianLineId: 'legacy-stored-line-id',
                 createdAt: Date.now(),
                 status: 'active'
             }
@@ -117,11 +117,11 @@ test('immediate-delete alert uses the authenticated profile and stored guardian 
     }, res, payload => { alertPayload = payload; });
 
     assert.equal(res.statusCode, 200);
-    assert.equal(alertPayload.guardianLinked, true);
-    assert.equal(alertPayload.eventStatus, 'pending');
+    assert.equal(alertPayload.guardianLinked, false);
+    assert.equal(alertPayload.eventStatus, 'blocked');
     assert.ok(alertPayload.eventId);
     assert.equal(
-        JSON.stringify(alertPayload).includes('verified-stored-line-id'),
+        JSON.stringify(alertPayload).includes('legacy-stored-line-id'),
         false,
         'the log callback must not receive the raw guardian LINE ID'
     );
@@ -129,9 +129,9 @@ test('immediate-delete alert uses the authenticated profile and stored guardian 
     const state = readState();
     assert.equal(state.users['delete-user'].status, 'app_deleted');
     assert.equal(state.outbox.length, 1);
-    assert.equal(state.outbox[0].recipientLineId, 'verified-stored-line-id');
+    assert.equal(state.outbox[0].recipientLineId, null);
     assert.equal(state.outbox[0].eventType, 'APP_TERMINATION_SIGNAL');
-    assert.equal(state.outbox[0].eventStatus, 'pending');
+    assert.equal(state.outbox[0].eventStatus, 'blocked');
     assert.equal(state.outbox[0].payload.reason, 'APP_TERMINATION_SIGNAL');
 });
 

@@ -67,9 +67,9 @@ begin
         );
     end if;
 
-    v_guardian_linked :=
-        v_user.guardian_line_id is not null
-        and btrim(v_user.guardian_line_id) <> '';
+    -- A legacy profile field does not prove provider-verified pairing or consent.
+    -- Keep all termination notices blocked until a reviewed verification contract exists.
+    v_guardian_linked := false;
 
     v_profile_data := case
         when jsonb_typeof(v_user.data) = 'object' then v_user.data

@@ -242,7 +242,8 @@ async function recordAppTermination(userId) {
                     (
                         typeof result.eventId === 'string' &&
                         /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(result.eventId) &&
-                        ['pending', 'blocked'].includes(result.eventStatus) &&
+                        result.eventStatus === 'blocked' &&
+                        result.guardianLinked === false &&
                         Number.isSafeInteger(result.deletedAt)
                     )
                 )
@@ -277,11 +278,8 @@ async function recordAppTermination(userId) {
     }
 
     const user = state.users[userId];
-    const guardianLineId = typeof user.guardianLineId === 'string' &&
-        user.guardianLineId.trim()
-        ? user.guardianLineId
-        : null;
-    const guardianLinked = Boolean(guardianLineId);
+    // A stored legacy ID is not proof of provider-verified pairing/consent.
+    const guardianLinked = false;
     const isAlreadyDeleted =
         user.status === 'app_deleted' ||
         (user.data && user.data.status === 'app_deleted');
@@ -301,14 +299,14 @@ async function recordAppTermination(userId) {
 
     const deletedAt = Date.now();
     const eventId = crypto.randomUUID();
-    const eventStatus = guardianLinked ? 'pending' : 'blocked';
+    const eventStatus = 'blocked';
 
     user.status = 'app_deleted';
     user.deletedAt = deletedAt;
     state.outbox.push({
         eventId,
         userId,
-        recipientLineId: guardianLineId,
+        recipientLineId: null,
         eventType: 'APP_TERMINATION_SIGNAL',
         eventStatus,
         attempts: 0,

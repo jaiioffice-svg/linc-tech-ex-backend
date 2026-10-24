@@ -35,18 +35,18 @@ async function record(database, userId) {
     return typeof value === 'string' ? JSON.parse(value) : value;
 }
 
-test('outbox migration atomically records app deletion and one pending notification event', async () => {
+test('outbox blocks legacy guardian IDs until verified pairing and consent exist', async () => {
     const database = new PGlite();
 
     try {
         await applyMigrations(database);
-        await seedUser(database, 'linked-user', 'verified-line-recipient');
+        await seedUser(database, 'linked-user', 'legacy-field-line-id');
 
         const first = await record(database, 'linked-user');
         assert.equal(first.found, true);
         assert.equal(first.alreadyRecorded, false);
-        assert.equal(first.guardianLinked, true);
-        assert.equal(first.eventStatus, 'pending');
+        assert.equal(first.guardianLinked, false);
+        assert.equal(first.eventStatus, 'blocked');
         assert.match(first.eventId, /^[0-9a-f-]{36}$/i);
         assert.ok(Number.isSafeInteger(first.deletedAt));
 
@@ -64,9 +64,9 @@ test('outbox migration atomically records app deletion and one pending notificat
         );
         assert.equal(events.rows.length, 1);
         assert.equal(events.rows[0].user_id, 'linked-user');
-        assert.equal(events.rows[0].recipient_line_id, 'verified-line-recipient');
+        assert.equal(events.rows[0].recipient_line_id, null, 'legacy guardian fields must never become recipients');
         assert.equal(events.rows[0].event_type, 'APP_TERMINATION_SIGNAL');
-        assert.equal(events.rows[0].event_status, 'pending');
+        assert.equal(events.rows[0].event_status, 'blocked');
         assert.equal(events.rows[0].attempts, 0);
         assert.equal(events.rows[0].reason, 'APP_TERMINATION_SIGNAL');
 
@@ -211,7 +211,8 @@ test('only service_role can read the outbox and execute the termination RPC', as
             ? JSON.parse(serviceCall.rows[0].result)
             : serviceCall.rows[0].result;
         assert.equal(value.found, true);
-        assert.equal(value.eventStatus, 'pending');
+        assert.equal(value.eventStatus, 'blocked');
+        assert.equal(value.guardianLinked, false);
     } finally {
         await database.close();
     }
