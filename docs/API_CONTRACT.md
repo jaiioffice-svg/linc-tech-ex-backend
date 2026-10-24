@@ -29,9 +29,9 @@ The Backend takes the user ID from the signed `sub` claim. A body-supplied `user
 |---|---|---|---|
 | POST `/api/v1/users/register` | Create or update the verified user's profile | Optional `userId` consistency check; optional `grade` string up to 32 characters. Creation defaults `grade` to `M1`. | HTTP 201 for a new profile; HTTP 200 for an existing profile. `{ "success": true, "message": "User profile registered" }` or `"User profile updated"`. |
 | POST `/api/v1/heartbeat` | Record a heartbeat for the verified user | Optional `userId` consistency check; optional `grade` string up to 32 characters. | HTTP 201 when it creates a missing profile; HTTP 200 when it updates an existing profile, with `{ "success": true, "message": "Heartbeat acknowledged" }`. |
-| POST `/api/v1/alert/delete` | Record an app-termination/deletion event for the verified user | Optional `userId` consistency check. | HTTP 200 with `success`, `alreadyRecorded`, `notificationStatus` and a message; HTTP 404 if the target profile does not exist. |
+| POST `/api/v1/alert/delete` | Record an app-termination/deletion event for the verified user | Optional `userId` consistency check; no `grade` or additional fields. | HTTP 200 with `success`, `alreadyRecorded`, `notificationStatus` and a message; HTTP 404 if the target profile does not exist. |
 
-Only `userId` and `grade` are supported request fields on these protected routes. Any other field, including client-supplied `guardianLineId`, nested `auth`, `role`, or `isAdmin`, is rejected with HTTP 400 (`UNSUPPORTED_FIELD`). Even if a handler is called directly, controllers must not use request-supplied fields to establish the authenticated user or verified guardian identity.
+Registration and heartbeat support only `userId` and `grade`; the delete route supports only `userId`. Any field outside the per-route allowlist, including client-supplied `guardianLineId`, nested `auth`, `role`, `isAdmin`, or `grade` on the delete route, is rejected with HTTP 400 (`UNSUPPORTED_FIELD`). Even if a handler is called directly, controllers must not use request-supplied fields to establish the authenticated user or verified guardian identity.
 
 ### App-termination notification semantics
 
