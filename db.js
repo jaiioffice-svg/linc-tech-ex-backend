@@ -6,7 +6,20 @@ const LOCAL_DB_FILE = process.env.LINC_DATA_FILE || path.join(__dirname, 'linc_d
 const SUPABASE_TABLE = 'linc_users';
 
 function hasSupabaseConfig() {
-    return Boolean(process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY);
+    const projectUrl = process.env.SUPABASE_URL;
+    const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+    const hasCanonicalProjectUrl =
+        typeof projectUrl === 'string' &&
+        projectUrl.length > 0 &&
+        projectUrl === projectUrl.trim() &&
+        !/[\\u0000-\\u001F\\u007F]/.test(projectUrl);
+    const hasCanonicalServiceKey =
+        typeof serviceKey === 'string' &&
+        serviceKey.length > 0 &&
+        serviceKey === serviceKey.trim() &&
+        !/[\\u0000-\\u001F\\u007F]/.test(serviceKey);
+
+    return hasCanonicalProjectUrl && hasCanonicalServiceKey;
 }
 
 function isDatabaseConfigured() {
