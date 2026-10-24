@@ -17,6 +17,7 @@ function getAuthenticatedUserId(req, res) {
     if (typeof authenticatedUserId !== 'string' ||
         !authenticatedUserId.trim() ||
         authenticatedUserId !== authenticatedUserId.trim() ||
+        /[\x00-\x1F\x7F]/.test(authenticatedUserId) ||
         authenticatedUserId.length > 200) {
         res.status(401).json({ success: false, message: 'Verified user identity is required' });
         return null;
