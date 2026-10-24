@@ -1,6 +1,6 @@
 # L!nc Backend — release progress scoreboard
 
-**As of: 2026-10-24 18:42 Asia/Bangkok**  
+**As of: 2026-10-24 18:47 Asia/Bangkok**  
 **Scope:** first safely usable end-to-end Backend MVP, not the complete product UI. The approved/deployed Client source is not currently confirmed, so this is a conservative engineering estimate, not a claim that the whole L!nc app is this complete.
 
 ## Executive status
@@ -15,7 +15,7 @@ The Candidate removes the import-time JSON file write and adds a configured Supa
 - **Estimated path-to-MVP completion: about 30% done / 70% remaining.** This is a weighted estimate of release gates, not a count of code lines or commits.
 - **Current Production service: NOT operational.** A read-only probe returned HTTP 500 `FUNCTION_INVOCATION_FAILED` from both `/health` and `/ready` at 2026-10-24 10:45 UTC. The active Production deployment is still `dpl_2ELeGpWoXTL6wFFvLEXxrLZzRgAk`, from `main` SHA `336e2fcdd1b9f0841432817dcafe955b45700eef`.
 - Candidate PR #2 remains **Draft and unmerged**. The code branch has not been validated as a deployed end-to-end release. No Production deployment/configuration or persistent DB was changed.
-- Latest Candidate code/test SHA `cdcb5f023c61d7902f93bbbf881e7a259cc27096` passed GitHub Actions [run #391](https://github.com/jaiioffice-svg/linc-tech-ex-backend/actions/runs/40090887352): **93 tests passed, 0 failed**. `LINC_API_KEY` now fails closed with HTTP 503 if missing or shorter than 32 UTF-8 bytes; tests cover an undersized configured key and a wrong request key of the same length as the configured key. The BFF sample checks the minimum length before sending, and API docs distinguish config failure (503) from a missing/incorrect request header (401). `npm ci`, `npm audit --audit-level=high` (**0 vulnerabilities**) and six-file `node --check` succeeded. The workflow uses checkout v7.0.1 and setup-node v7.1.0 pinned to full commit SHAs; run #371 confirmed the Node 24-compatible action upgrade. CI does not prove live Supabase, BFF, current Preview deployment or Production integration.
+- Latest Candidate HEAD `33ad95e4df339ee18c44cb16c8d3db1c006ffc2d` passed GitHub Actions [run #397](https://github.com/jaiioffice-svg/linc-tech-ex-backend/actions/runs/40091186797): **94 tests passed, 0 failed**. Tests cover the minimum 32-byte configured API key, same-length incorrect request keys, signed assertion hardening, outbox RPC shape validation, and required Helmet security headers (`nosniff`, `SAMEORIGIN`, `no-referrer`, no `X-Powered-By`). The BFF/API docs distinguish missing/undersized server config (503) from a missing/incorrect request header (401). `npm ci`, `npm audit --audit-level=high` (**0 vulnerabilities**) and six-file `node --check` succeeded. The workflow uses checkout v7.0.1 and setup-node v7.1.0 pinned to full commit SHAs; run #371 confirmed the Node 24-compatible action upgrade. CI does not prove live Supabase, BFF, current Preview deployment or Production integration.
 
 ## Percentage reporting correction — one fixed baseline from now on
 
@@ -38,7 +38,7 @@ The weighting is an explicit planning estimate for the **first safe end-to-end B
 | Workstream | Weight | Estimated completion | Contribution | Evidence / blocker |
 |---|---:|---:|---:|---|
 | Backend route/controller foundation, validation, ownership guards, outbox logic | 25% | 65% | 16.25% | Candidate code and regression coverage exist; verified session middleware is intentionally fail-closed until a trusted BFF is connected. |
-| Repeatable dependency install, audit and automated CI | 10% | 100% | 10% | Latest Candidate code/test SHA `cdcb5f0`: run #391 passed 93 tests with zero failures, `npm audit --audit-level=high` reported 0 vulnerabilities and six runtime syntax checks passed; lockfile installation succeeded. The workflow uses checkout v7.0.1 and setup-node v7.1.0 pinned to full commit SHAs. This is not live integration proof. |
+| Repeatable dependency install, audit and automated CI | 10% | 100% | 10% | Latest Candidate HEAD `33ad95e`: run #397 passed 94 tests with zero failures, `npm audit --audit-level=high` reported 0 vulnerabilities and six runtime syntax checks passed; lockfile installation succeeded. HTTP integration also verifies Helmet's baseline security headers. The workflow uses checkout v7.0.1 and setup-node v7.1.0 pinned to full commit SHAs. This is not live integration proof. |
 | Hosted Supabase migration/RLS/RPC and real CRUD verification in an isolated non-production project | 20% | 10% | 2% | Core/replay/outbox migrations and PGlite tests exist; no migration was applied to a persistent database and actual Preview project isolation is unconfirmed. |
 | Approved Client session → trusted BFF → signed Backend assertion | 20% | 0% | 0% | Contract documentation exists, but no approved Client/BFF repo/session source or verified deployed commit has been identified in the connected GitHub/Vercel inventory. |
 | Provider-verified guardian pairing, explicit consent, Official Account friend state and real LINE dispatcher | 15% | 5% | 0.75% | Design contract now documented; no pairing implementation, dispatcher, or live LINE delivery exists. Legacy recipient IDs are blocked. |
@@ -65,9 +65,10 @@ Therefore, **the ~30% figure applies only to the first safe Backend MVP**, not t
 1. The Candidate has a service-key + signed internal assertion + verified-principal + request-validation middleware chain. Missing trusted user identity fails closed; the BFF/session bridge is not implemented.
 2. Assertion replay protection and the durable termination outbox have embedded PostgreSQL-compatible regression tests.
 3. The outbox now **blocks** events and stores no recipient when the only evidence is a legacy `guardian_line_id`; the app adapter also rejects unsafe RPC responses.
-4. Latest Candidate code/test SHA `cdcb5f0` passed GitHub Actions run #391 with 93 tests and zero failures, `npm audit --audit-level=high` reporting 0 vulnerabilities, and six-file JavaScript syntax checks. Assertion subjects are canonicalized, outbox RPC responses are strictly validated, and the service API key must be at least 32 UTF-8 bytes.
+4. Latest Candidate HEAD `33ad95e` passed GitHub Actions run #397 with 94 tests and zero failures, `npm audit --audit-level=high` reporting 0 vulnerabilities, and six-file JavaScript syntax checks. Assertion subjects are canonicalized, outbox RPC responses are strictly validated, the service API key must be at least 32 UTF-8 bytes, and Helmet's HTTP security headers are checked in an integration test.
 5. Added [`docs/API_CONTRACT.md`](./API_CONTRACT.md) as a single Candidate API reference for liveness/readiness, authenticated route contracts, status codes, payload limits, CORS and the fact that app-termination status `blocked` records an event but does not send a LINE message. This is documentation work; it does not close live integration gates.
 6. Upgraded GitHub Actions checkout/setup-node to current Node 24-compatible releases pinned to full commit SHAs; the workflow transition passed run #371. The BFF signing/request example and error table now match the minimum key-length contract.
+7. Cleaned the architecture contract to remove a duplicate file-layout entry and align its description with the current blocked outbox/strict assertion and API-key behavior.
 5. Release-gate, outbox fail-closed, and guardian-pairing contracts are saved in this branch.
 
 ## Remaining gates in dependency order
