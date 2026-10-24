@@ -90,6 +90,45 @@ test('replay migration executes in embedded PostgreSQL and enforces one-time use
     }
 });
 
+test('concurrent consumes for the same JTI accept exactly one request', async () => {
+    const database = new PGlite();
+
+    try {
+        await database.exec(
+            'CREATE ROLE anon; CREATE ROLE authenticated; CREATE ROLE service_role;'
+        );
+        const migrationPath = path.join(
+            __dirname,
+            '..',
+            'supabase',
+            'migrations',
+            '20261024_003_auth_assertion_replay.sql'
+        );
+        await database.exec(fs.readFileSync(migrationPath, 'utf8'));
+
+        const now = Math.floor(Date.now() / 1000);
+        const jti = 'concurrent-replay-test-0001';
+        const attempts = await Promise.all(
+            Array.from({ length: 12 }, () => database.query(
+                'SELECT public.linc_consume_auth_assertion($1, $2) AS accepted',
+                [jti, now + 45]
+            ))
+        );
+        const acceptedCount = attempts.filter(result => result.rows[0].accepted === true).length;
+        const rejectedCount = attempts.filter(result => result.rows[0].accepted === false).length;
+
+        assert.equal(acceptedCount, 1, 'exactly one concurrent consume may succeed');
+        assert.equal(rejectedCount, 11, 'all duplicate concurrent consumes must be rejected');
+        const stored = await database.query(
+            'SELECT count(*)::int AS count FROM public.linc_auth_assertion_replays WHERE jti = $1',
+            [jti]
+        );
+        assert.equal(stored.rows[0].count, 1);
+    } finally {
+        await database.close();
+    }
+});
+
 test('replay RPC rejects malformed IDs and invalid expiry boundaries', async () => {
     const database = new PGlite();
 
