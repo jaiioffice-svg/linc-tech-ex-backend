@@ -484,6 +484,37 @@ test('recordAppTermination rejects malformed RPC results without exposing upstre
     }
 });
 
+test('saveUser rejects unsupported profile statuses before local or Supabase writes', async () => {
+    const db = require('../db');
+    const originalFetch = global.fetch;
+    let fetchCalls = 0;
+    global.fetch = async () => {
+        fetchCalls += 1;
+        return new Response(null, { status: 204 });
+    };
+
+    try {
+        await withEnv({
+            VERCEL: '1',
+            VERCEL_ENV: 'preview',
+            SUPABASE_URL: 'https://example-project.supabase.co',
+            SUPABASE_SERVICE_ROLE_KEY: 'sb_secret_test_only'
+        }, async () => {
+            for (const status of ['', null, 'pending', 'deleted', 'admin']) {
+                await assert.rejects(
+                    db.saveUser({ userId: 'status-user', grade: 'M1', status }),
+                    error => error instanceof TypeError &&
+                        error.message === 'A valid user status is required'
+                );
+            }
+        });
+
+        assert.equal(fetchCalls, 0, 'unsupported status must be rejected before any persistence request');
+    } finally {
+        global.fetch = originalFetch;
+    }
+});
+
 test('saveUser persists a profile using a Supabase upsert', async () => {
     const db = require('../db');
     const originalFetch = global.fetch;
