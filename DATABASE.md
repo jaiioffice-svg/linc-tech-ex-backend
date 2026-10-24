@@ -28,10 +28,11 @@ Before applying SQL, review the target schema and confirm the project reference.
 4. `supabase/migrations/20261024_003_auth_assertion_replay.sql` — durable, one-time signed-assertion replay protection RPC.
 5. `supabase/migrations/20261024_004_notification_outbox.sql` — RLS-protected outbox and atomic app-termination recording RPC; new tables default events to `blocked` and enforce recipient/status consistency.
 6. `supabase/migrations/20261024_005_outbox_fail_closed_default.sql` — upgrades a previously created outbox table to the fail-closed default, normalizes contradictory records without recipients, and adds the recipient/status constraint idempotently. Review the normalization of existing outbox rows before authorizing it.
+7. `supabase/migrations/20261024_006_disable_unverified_outbox_dispatch.sql` — replaces any weaker recipient/status constraint, converts `pending`/`processing`/`retry` events to `blocked`, clears all outbox recipient IDs, preserves terminal `sent`/`dead` labels, and disables dispatchable states until a reviewed pairing/dispatcher migration.
 
 After each migration, verify success and inspect the resulting object/grant state before continuing. Do not run the separate `migrations/001_create_linc_app_state.sql` file: it belongs to an old local PostgreSQL prototype and is not used by the Supabase REST adapter.
 
-These migrations have been tested in the Candidate test suite, including PGlite-based PostgreSQL execution, but they have **not** been applied to a persistent Supabase database. PGlite is not proof of the target project's PostgREST schema cache, access configuration, project identity, or deployment credentials.
+These seven Candidate migrations have been tested in the Candidate suite, including PGlite execution of a simulated legacy outbox upgrade, but they have **not** been applied to a persistent Supabase database. PGlite is not proof of the target project's PostgREST schema cache, access configuration, project identity, or deployment credentials.
 
 ## Verification after an authorized Preview migration
 
