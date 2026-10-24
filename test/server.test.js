@@ -118,6 +118,7 @@ test('registration cannot set guardian identity from an untrusted request body',
     const originalFetch = global.fetch;
     let savedRow;
     global.fetch = async (url, options = {}) => {
+        if (String(url).startsWith('http://127.0.0.1:')) return originalFetch(url, options);
         if (options.method === 'POST') {
             savedRow = JSON.parse(options.body);
             return new Response(null, { status: 204 });
@@ -161,6 +162,7 @@ test('heartbeat does not reactivate a profile marked app_deleted', async () => {
     const originalFetch = global.fetch;
     let savedRow;
     global.fetch = async (url, options = {}) => {
+        if (String(url).startsWith('http://127.0.0.1:')) return originalFetch(url, options);
         if (options.method === 'POST') {
             savedRow = JSON.parse(options.body);
             return new Response(null, { status: 204 });
