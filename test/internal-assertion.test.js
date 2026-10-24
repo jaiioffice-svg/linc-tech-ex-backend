@@ -1,7 +1,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const crypto = require('node:crypto');
-const { authenticateInternalAssertion } = require('../internal-assertion');
+const { createInternalAssertionMiddleware } = require('../internal-assertion');
 
 const SECRET = 'test-only-internal-auth-secret-1234567890';
 const ROUTE = '/api/v1/heartbeat';
@@ -79,8 +79,11 @@ async function run(token, options = {}) {
     const res = mockResponse();
     let nextCalled = false;
     const secret = Object.prototype.hasOwnProperty.call(options, 'secret') ? options.secret : SECRET;
+    const middleware = createInternalAssertionMiddleware({
+        consumeAssertionId: options.consumeAssertionId || (async () => true)
+    });
     await withSecret(secret, async () => {
-        authenticateInternalAssertion(req, res, () => {
+        await middleware(req, res, () => {
             nextCalled = true;
         });
     });
@@ -106,7 +109,10 @@ test('valid short-lived assertion establishes only the verified principal fields
     let nextCalled = false;
 
     await withSecret(SECRET, async () => {
-        authenticateInternalAssertion(req, res, () => {
+        const middleware = createInternalAssertionMiddleware({
+            consumeAssertionId: async () => true
+        });
+        middleware(req, res, () => {
             nextCalled = true;
         });
     });
@@ -118,6 +124,47 @@ test('valid short-lived assertion establishes only the verified principal fields
     assert.equal(req.auth.assertionId, 'assertion-id-000001');
     assert.equal(typeof req.auth.expiresAt, 'number');
     assert.equal(Object.isFrozen(req.auth), true);
+});
+
+
+test('a short-lived assertion can be consumed only once', async () => {
+    const token = signAssertion();
+    const consumed = new Set();
+    const consumeAssertionId = async assertionId => {
+        if (consumed.has(assertionId)) return false;
+        consumed.add(assertionId);
+        return true;
+    };
+
+    const first = await run(token, { consumeAssertionId });
+    const second = await run(token, { consumeAssertionId });
+
+    assert.equal(first.nextCalled, true);
+    assert.equal(first.req.auth.userId, 'verified-user-123');
+    assert.equal(second.res.statusCode, 401);
+    assert.equal(second.nextCalled, false);
+    assert.equal(second.res.body.message, 'Unauthorized connection');
+});
+
+test('assertion verification fails closed when durable replay storage is unavailable', async () => {
+    const result = await run(signAssertion(), {
+        consumeAssertionId: async () => {
+            const error = new Error('private database connection details');
+            error.code = 'DB_UNAVAILABLE';
+            throw error;
+        }
+    });
+
+    assert.equal(result.res.statusCode, 503);
+    assert.equal(
+        result.res.body.message,
+        'Identity verification service is temporarily unavailable'
+    );
+    assert.equal(
+        JSON.stringify(result.res.body).includes('private database connection details'),
+        false
+    );
+    assert.equal(result.nextCalled, false);
 });
 
 test('opaque bearer token alone is not accepted as an internal assertion', async () => {
