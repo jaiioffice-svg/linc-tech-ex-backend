@@ -19,6 +19,7 @@ The current Backend repository is intentionally kept in its existing flat layout
 - api/[...path].js — Vercel catch-all entry adapter; keep its routing behavior covered by tests.
 - auth.js — shared-service-key gate and fail-closed verified-user gate.
 - error-handler.js — centralized sanitized 404 and error responses.
+- request-validation.js — bounded shape validation for user-related request bodies.
 - controllers.js — registration, heartbeat, and delete-alert handlers.
 - db.js — Supabase REST adapter; local JSON persistence is restricted to local development.
 - server.js — Express app, CORS, health/readiness, protected API routes.
@@ -145,3 +146,15 @@ The database adapter now applies an 8-second abort timeout to each Supabase REST
 Regression coverage in `test/db.test.js` verifies that a signal is attached, a simulated `AbortError` is normalized, and invalid upstream JSON becomes a generic database-unavailable error. Candidate commit `92f4fc02f68edc81c4ae333739c2265945550980` passed **44/44 tests** in the isolated Sandbox; `npm audit` reported 0 vulnerabilities; `node --check server.js`, `node --check db.js`, and `node --check error-handler.js` passed; Vercel config/scope checks and `git diff --check` passed; GitHub Actions [run #167](https://github.com/jaiioffice-svg/linc-tech-ex-backend/actions/runs/40076900623) succeeded.
 
 This is a bounded-failure improvement for the Candidate. It does not prove real Supabase connectivity or user-session verification.
+
+## 13. Protected API request-shape validation (2026-10-24)
+
+The protected registration, heartbeat and app-delete routes now run `validateUserRequest` after the shared service-key and verified-user middleware. The validator:
+- Requires a JSON object when a request body is supplied; null and array bodies are rejected.
+- Allows an optional `userId` only when it is a non-empty string of at most 200 characters. The ID remains a consistency check only; identity is still derived from the verified `req.auth.userId`.
+- Allows an optional `grade` only as a string of at most 32 characters.
+- Does not copy arbitrary body fields into trusted identity or guardian-pairing state.
+
+Regression tests in `test/request-validation.test.js` cover missing/null/array bodies, malformed or oversized user IDs, invalid grades and a valid request shape. On Candidate commit `5a1ae892f37df094fddd65666d397cb7325431b5`, isolated Sandbox checks passed **49/49 tests**, `npm audit` reported 0 vulnerabilities, all four backend JavaScript entry/middleware files passed `node --check`, Vercel config/scope and `git diff --check` passed, and GitHub Actions [run #175](https://github.com/jaiioffice-svg/linc-tech-ex-backend/actions/runs/40077023815) succeeded.
+
+This is request-shape validation only; the approved Client session contract and the production end-user identity verifier remain unresolved.
