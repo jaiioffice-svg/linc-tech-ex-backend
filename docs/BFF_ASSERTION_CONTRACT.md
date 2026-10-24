@@ -9,7 +9,7 @@ This is the proposed server-to-server contract for the Candidate branch. It has 
 1. The Client sends its current opaque session token only to the Client's own server-side BFF over HTTPS.
 2. The BFF validates the session using the authoritative server-side session store and checks expiry/revocation. The user ID must come from that verified session record, never a request-body field.
 3. After successful session validation, the BFF signs a short-lived HS256 assertion for exactly one Backend POST route.
-4. The BFF calls the Backend with both `x-linc-api-key` and `x-linc-user-assertion` headers. The Backend validates the service key, signature, issuer, audience, expiry, subject, unique assertion ID, and route scope, then sets `req.auth.userId` from the signed `sub` claim.
+4. The BFF calls the Backend with both `x-linc-api-key` and `x-linc-user-assertion` headers. The Backend validates the service key, signature, issuer, audience, expiry, subject, assertion ID format, and route scope, then sets `req.auth.userId` from the signed `sub` claim.
 5. User-scoped controllers continue deriving identity from `req.auth.userId`. If the request body also contains `userId`, it must match the signed subject.
 
 ## Required environment variables
