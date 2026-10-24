@@ -108,12 +108,16 @@ test('authenticated registration API integration with isolated Supabase boundary
         }
     });
 
+    const assertion = createAssertion();
+    const assertionClaims = JSON.parse(
+        Buffer.from(assertion.split('.')[1], 'base64url').toString('utf8')
+    );
     const response = await nativeFetch(`${baseUrl}/api/v1/users/register`, {
         method: 'POST',
         headers: {
             'content-type': 'application/json',
             'x-linc-api-key': API_KEY,
-            'x-linc-user-assertion': createAssertion()
+            'x-linc-user-assertion': assertion
         },
         body: JSON.stringify({
             userId: USER_ID,
@@ -134,7 +138,7 @@ test('authenticated registration API integration with isolated Supabase boundary
     assert.match(calls[0].path, /\/rpc\/linc_consume_auth_assertion$/);
     assert.deepEqual(calls[0].body, {
         p_jti: 'test-assertion-id-000001',
-        p_expires_at: Number(createAssertionExpiry())
+        p_expires_at: assertionClaims.exp
     });
     assert.equal(calls[1].method, 'GET');
     assert.match(calls[1].query, /user_id=eq.integration-user-001/);
@@ -161,6 +165,3 @@ test('authenticated registration API integration with isolated Supabase boundary
     assert.equal(calls[2].headers.Authorization, undefined);
 });
 
-function createAssertionExpiry() {
-    return Math.floor(Date.now() / 1000) + 30;
-}
