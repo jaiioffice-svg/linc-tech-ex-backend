@@ -9,9 +9,10 @@ create table if not exists public.linc_notification_outbox (
         check (event_type in ('APP_TERMINATION_SIGNAL')),
     event_status text not null default 'blocked'
         check (event_status in ('pending', 'blocked', 'processing', 'retry', 'sent', 'dead')),
+    -- Current Candidate has no provider-verified pairing or dispatcher. Keep all
+    -- outbound work states disabled until a later reviewed pairing migration.
     constraint linc_notification_outbox_recipient_status_check check (
-        (event_status = 'blocked' and recipient_line_id is null) or
-        (event_status in ('pending', 'processing', 'retry', 'sent', 'dead') and recipient_line_id is not null)
+        event_status in ('blocked', 'sent', 'dead') and recipient_line_id is null
     ),
     attempts integer not null default 0 check (attempts >= 0),
     next_attempt_at timestamptz not null default now(),
