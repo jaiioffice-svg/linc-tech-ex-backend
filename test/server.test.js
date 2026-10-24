@@ -4,7 +4,7 @@ const app = require('../server');
 
 let server;
 let baseUrl;
-const envKeys = ['LINC_API_KEY', 'SUPABASE_URL', 'SUPABASE_SERVICE_ROLE_KEY', 'VERCEL', 'VERCEL_ENV'];
+const envKeys = ['LINC_API_KEY', 'LINC_INTERNAL_AUTH_SECRET', 'SUPABASE_URL', 'SUPABASE_SERVICE_ROLE_KEY', 'VERCEL', 'VERCEL_ENV'];
 const originalEnv = Object.fromEntries(envKeys.map(key => [key, process.env[key]]));
 
 test.before(async () => {
