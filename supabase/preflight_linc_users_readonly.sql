@@ -2,6 +2,7 @@
 -- supabase/migrations/20261024_linc_users_backend.sql
 -- Run this file in Supabase SQL Editor and inspect each result.
 -- This file intentionally performs no INSERT, UPDATE, DELETE, ALTER, or CREATE.
+-- Privacy: duplicate checks return aggregate counts only, never user identifiers.
 
 -- 1) Confirm whether public.linc_users exists and inspect its columns/types/defaults.
 select
@@ -64,14 +65,19 @@ order by grantee, privilege_type;
 select count(*) as existing_row_count
 from public.linc_users;
 
--- 7) Check duplicate user_id values. Any returned row means the migration's
--- unique index may fail and data must be reviewed before schema changes.
-select user_id, count(*) as duplicate_count
-from public.linc_users
-group by user_id
-having count(*) > 1
-order by duplicate_count desc
-limit 100;
+-- 7) Check duplicate user_id values without returning identifiers.
+-- duplicate_group_count > 0 means duplicates exist; duplicate_row_count is
+-- the total number of rows belonging to duplicated user_id groups.
+select
+  count(*) as duplicate_group_count,
+  coalesce(sum(group_size), 0) as duplicate_row_count,
+  coalesce(sum(group_size - 1), 0) as excess_duplicate_row_count
+from (
+  select count(*) as group_size
+  from public.linc_users
+  group by user_id
+  having count(*) > 1
+) duplicate_groups;
 
 -- 8) Check null/blank identifiers before relying on user_id uniqueness.
 select
