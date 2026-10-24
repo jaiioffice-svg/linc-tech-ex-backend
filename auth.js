@@ -27,7 +27,12 @@ function validateApiKey(req, res, next) {
 function requireVerifiedEndUser(req, res, next) {
     const authenticatedUserId = req.auth && req.auth.userId;
 
-    if (typeof authenticatedUserId !== 'string' || !authenticatedUserId.trim()) {
+    if (
+        typeof authenticatedUserId !== 'string' ||
+        !authenticatedUserId.trim() ||
+        authenticatedUserId !== authenticatedUserId.trim() ||
+        authenticatedUserId.length > 200
+    ) {
         return res.status(503).json({
             success: false,
             message: 'End-user identity verification is not configured'
