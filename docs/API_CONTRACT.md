@@ -5,7 +5,7 @@
 This document describes the Candidate branch only. It is not evidence that the Candidate is deployed or that the approved Client calls these routes. PR #2 remains Draft and unmerged.
 
 Every protected route under `/api/v1` requires both:
-- `x-linc-api-key`: a server-to-server secret shared only by the trusted BFF and Backend.
+- `x-linc-api-key`: a cryptographically random server-to-server secret of at least 32 UTF-8 bytes, shared only by the trusted BFF and Backend. The Backend fails closed with HTTP 503 when it is missing or undersized.
 - `x-linc-user-assertion`: a short-lived signed assertion minted by the BFF only after it verifies the user's authoritative session.
 
 The Backend takes the user ID from the signed `sub` claim. A body-supplied `userId` is optional and, when present, must exactly match that subject. The Client/browser/mobile app must not hold either server secret or mint assertions itself. See [BFF Assertion Contract](./BFF_ASSERTION_CONTRACT.md).
