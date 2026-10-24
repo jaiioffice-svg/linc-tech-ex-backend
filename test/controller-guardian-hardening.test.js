@@ -262,14 +262,16 @@ test('controller rejects cross-account profile claiming before database access',
     assert.equal(Object.hasOwn(readState().users, 'account-b'), false);
 });
 
-test('controller rejects noncanonical trusted principal before reading or writing user state', async () => {
-    const res = mockResponse();
-    await handleUserRegistration({
-        auth: { userId: ' spaced-user ' },
-        body: {}
-    }, res);
+test('controller rejects noncanonical trusted principals before reading or writing user state', async () => {
+    for (const userId of [' spaced-user ', 'a'.repeat(201), 'user' + String.fromCharCode(1) + 'id']) {
+        const res = mockResponse();
+        await handleUserRegistration({
+            auth: { userId },
+            body: {}
+        }, res);
 
-    assert.equal(res.statusCode, 401);
-    assert.equal(res.body.message, 'Verified user identity is required');
-    assert.equal(Object.hasOwn(readState().users, ' spaced-user '), false);
+        assert.equal(res.statusCode, 401);
+        assert.equal(res.body.message, 'Verified user identity is required');
+        assert.equal(Object.hasOwn(readState().users, userId), false);
+    }
 });
