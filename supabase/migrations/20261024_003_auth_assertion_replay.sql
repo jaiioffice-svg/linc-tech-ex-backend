@@ -58,3 +58,6 @@ revoke all on function public.linc_consume_auth_assertion(text, bigint)
     from public, anon, authenticated;
 grant execute on function public.linc_consume_auth_assertion(text, bigint)
     to service_role;
+
+-- Make the newly created RPC visible to PostgREST without manual schema-cache work.
+notify pgrst, 'reload schema';
