@@ -32,13 +32,16 @@ test('every /api/v1 route enforces service and verified end-user auth in order',
         const middlewareNames = route.stack.map(layer => layer.name);
         const label = `${Object.keys(route.methods).join(',').toUpperCase()} ${route.path}`;
         const serviceAuthIndex = middlewareNames.indexOf('validateApiKey');
+        const assertionAuthIndex = middlewareNames.indexOf('authenticateInternalAssertion');
         const endUserAuthIndex = middlewareNames.indexOf('requireVerifiedEndUser');
 
         assert.notEqual(serviceAuthIndex, -1, `${label} must use validateApiKey`);
+        assert.notEqual(assertionAuthIndex, -1, `${label} must use authenticateInternalAssertion`);
         assert.notEqual(endUserAuthIndex, -1, `${label} must use requireVerifiedEndUser`);
         assert.ok(
-            serviceAuthIndex < endUserAuthIndex,
-            `${label} must validate service authentication before end-user identity`
+            serviceAuthIndex < assertionAuthIndex &&
+            assertionAuthIndex < endUserAuthIndex,
+            `${label} must validate service key, then signed end-user assertion, then principal`
         );
     }
 });
@@ -54,17 +57,17 @@ test('every /api/v1 route validates payload shape after verified identity', () =
     for (const route of routes) {
         const middlewareNames = route.stack.map(layer => layer.name);
         const label = `${Object.keys(route.methods).join(',').toUpperCase()} ${route.path}`;
+        const serviceAuthIndex = middlewareNames.indexOf('validateApiKey');
+        const assertionAuthIndex = middlewareNames.indexOf('authenticateInternalAssertion');
         const endUserAuthIndex = middlewareNames.indexOf('requireVerifiedEndUser');
         const validationIndex = middlewareNames.indexOf('validateUserRequest');
 
-        assert.notEqual(
-            validationIndex,
-            -1,
-            `${label} must validate its request payload`
-        );
+        assert.notEqual(validationIndex, -1, `${label} must validate its request payload`);
         assert.ok(
+            serviceAuthIndex < assertionAuthIndex &&
+            assertionAuthIndex < endUserAuthIndex &&
             endUserAuthIndex < validationIndex,
-            `${label} must verify end-user identity before request validation`
+            `${label} must validate service key, signed assertion, principal and payload in order`
         );
     }
 });
