@@ -37,7 +37,7 @@ async function withEnvAsync(values, callback) {
 
 test('Supabase config requires both URL and service key', () => {
     withEnv({ SUPABASE_URL: 'https://example.supabase.co', SUPABASE_SERVICE_ROLE_KEY: undefined }, () => {
-        assert.equal(hasSupabaseConfig(), false);
+        assert.equal(hasSupabaseConfig(), false, `malformed Supabase config must be rejected: ${JSON.stringify(values)}`);
     });
     withEnv({ SUPABASE_URL: undefined, SUPABASE_SERVICE_ROLE_KEY: 'test-only-key' }, () => {
         assert.equal(hasSupabaseConfig(), false);
@@ -65,7 +65,7 @@ test('Supabase config fails closed on blank, padded, or control-character enviro
             { SUPABASE_URL: ' https://example-project.supabase.co', SUPABASE_SERVICE_ROLE_KEY: 'sb_secret_test_only_key' },
             { SUPABASE_URL: 'https://example-project.supabase.co', SUPABASE_SERVICE_ROLE_KEY: ' sb_secret_test_only_key' },
             { SUPABASE_URL: 'https://example-project.supabase.co', SUPABASE_SERVICE_ROLE_KEY: 'sb_secret_test_only_key' + String.fromCharCode(10) },
-            { SUPABASE_URL: 'https://example-project.supabase.co' + String.fromCharCode(0), SUPABASE_SERVICE_ROLE_KEY: 'sb_secret_test_only_key' }
+            { SUPABASE_URL: 'https://example-project.supabase.co' + String.fromCharCode(1), SUPABASE_SERVICE_ROLE_KEY: 'sb_secret_test_only_key' }
         ];
 
         for (const values of invalidConfigs) {
