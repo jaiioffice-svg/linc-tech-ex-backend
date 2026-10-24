@@ -34,7 +34,7 @@ The current Backend verifier requires a compact JWT with header `{"alg":"HS256",
 | `jti` | fresh random identifier, 16–128 URL-safe characters |
 | `scope` | exact one of `/api/v1/heartbeat`, `/api/v1/users/register`, or `/api/v1/alert/delete`, and it must match the actual request path |
 
-The BFF should use a 30-second expiry. The assertion must never be returned to the browser or mobile client. It is a bearer credential and can be replayed until expiry; the current verifier does not persist/consume `jti` for one-time replay prevention. Keep transport server-to-server over HTTPS, keep TTL short, never log assertion values, and make operations idempotent. App-delete handling now avoids re-emitting an alert after the profile is already in terminal `app_deleted` state. Add durable assertion replay prevention if the threat model requires one-time use before enabling this in Production.
+The verifier also rejects unsupported JWT header fields and rejects an nbf timestamp that is later than exp. The BFF should use a 30-second expiry. The assertion must never be returned to the browser or mobile client. It is a bearer credential and can be replayed until expiry; the current verifier does not persist/consume `jti` for one-time replay prevention. Keep transport server-to-server over HTTPS, keep TTL short, never log assertion values, and make operations idempotent. App-delete handling now avoids re-emitting an alert after the profile is already in terminal `app_deleted` state. Add durable assertion replay prevention if the threat model requires one-time use before enabling this in Production.
 
 ## BFF signing helper (Node.js)
 
