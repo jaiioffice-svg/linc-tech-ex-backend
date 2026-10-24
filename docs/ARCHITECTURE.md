@@ -244,3 +244,13 @@ Latest read-only Production GETs at 09:22 UTC again returned HTTP 500 `FUNCTION_
 - `GET /ready`: request ID `sin1::2jmpn-1792833731860-95b962b160ed`
 
 Vercel's active Production deployment remains `dpl_2ELeGpWoXTL6wFFvLEXxrLZzRgAk` from `main` SHA `336e2fcdd1b9f0841432817dcafe955b45700eef`. The Candidate remains Draft/unmerged with automatic deployments paused on its branch. No Production code/settings, credentials, SQL, persistent data, or notifications were changed.
+
+## 21. Durable app-termination notification outbox — 2026-10-24
+
+The backend no longer relies only on a log line to represent an app-removal notification. The Candidate adds `supabase/migrations/20261024_004_notification_outbox.sql`, which creates the RLS-protected `linc_notification_outbox` table and the privileged `linc_record_app_termination(text)` RPC. The RPC locks the user row, marks the profile `app_deleted`, and creates a notification outbox event in the same PostgreSQL transaction. If event insertion fails, the status transition rolls back as well. Repeated deletion returns `alreadyRecorded=true` and does not create a duplicate event. With a verified guardian ID the event begins `pending`; without one it is recorded as `blocked` with no recipient.
+
+`db.recordAppTermination` uses the RPC when Supabase is configured. The local-development adapter persists status and outbox together in a single JSON-file write. The controller logs only event ID/reason/status and a boolean guardian-linked indicator; it no longer passes a raw guardian LINE ID into the logging callback. No notification is actually delivered by this change: an outbox dispatcher and real LINE-provider integration are separate release work. `pending` means queued for a future worker, not sent.
+
+The new `test/notification-outbox-postgres.test.js` executes migrations `20261022_002_linc_core.sql`, `20261024_003_auth_assertion_replay.sql`, and `20261024_004_notification_outbox.sql` in order inside PGlite. It verifies linked-recipient pending events, no-guardian blocked events, missing-user no-op, duplicate-delete idempotency, role permissions/RLS, and rollback of the profile update if the outbox insert fails.
+
+Exact Candidate code/test commit `a2f986e1a2b05aa67cbc223065bc65f8e338f87a` passed **80/80 tests** in an isolated Vercel Sandbox after clean `npm ci` (86 packages); `npm audit` found 0 vulnerabilities; syntax checks, Vercel scope/config and `git diff --check` passed. GitHub Actions [run #305](https://github.com/jaiioffice-svg/linc-tech-ex-backend/actions/runs/40082133714) succeeded. This is embedded PostgreSQL integration, not a live Supabase deployment test; migrations `003` and `004` have not been applied to any persistent database.
