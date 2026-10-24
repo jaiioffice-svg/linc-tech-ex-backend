@@ -67,7 +67,11 @@ exports.handleHeartbeat = async (req, res) => {
 
         if (existingUser && typeof grade === 'string' && grade.trim()) user.grade = grade.trim();
         user.lastHeartbeat = now;
-        user.status = 'active';
+        // A heartbeat is not proof of a legitimate reinstall or user reactivation.
+        // Preserve terminal app_deleted status; recovery must use an explicit trusted flow.
+        if (!existingUser || existingUser.status !== 'app_deleted') {
+            user.status = 'active';
+        }
         await saveUser(user);
 
         return res.status(existingUser ? 200 : 201).json({
