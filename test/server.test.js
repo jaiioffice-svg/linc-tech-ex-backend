@@ -174,3 +174,22 @@ test('heartbeat fails closed without verified identity and does not write persis
         for (const key of ['LINC_API_KEY', 'SUPABASE_URL', 'SUPABASE_SERVICE_ROLE_KEY']) delete process.env[key];
     }
 });
+
+test('registration cannot spoof req.auth by nesting an auth object in JSON body', async () => {
+    process.env.LINC_API_KEY = 'test-only-key';
+    const response = await fetch(`${baseUrl}/api/v1/users/register`, {
+        method: 'POST',
+        headers: {
+            'content-type': 'application/json',
+            'x-linc-api-key': 'test-only-key'
+        },
+        body: JSON.stringify({
+            userId: 'claimed-user',
+            auth: { userId: 'claimed-user' }
+        })
+    });
+    const body = await response.json();
+    assert.equal(response.status, 503);
+    assert.equal(body.message, 'End-user identity verification is not configured');
+    delete process.env.LINC_API_KEY;
+});
