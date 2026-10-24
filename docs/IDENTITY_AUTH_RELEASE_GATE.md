@@ -21,11 +21,12 @@ The separate documentation review `docs/CLIENT-SESSION-CONTRACT-REVIEW-20261024.
 
 For that archive only, the review found:
 - Client reads `linc_session_token` from browser `localStorage` and sends it as `Authorization: Bearer <token>`.
+- The inspected archive's `src/services/api.ts` uses relative URLs such as `/api/user/setup` and `/api/heartbeat/ping`; it does not define a separate base URL for this GitHub backend. Its `.env.example` has `APP_URL="MY_APP_URL"`, a placeholder, not a verified deployed client domain.
 - Server creates a random opaque token, stores its SHA-256 hash in a JSON-file `db.sessions` store, and gives it a 30-day expiry.
 - The archive's `getSessionUserId` validates the stored hash and expiry; `requireOwner` compares the resolved session user against the requested profile ID.
 - The separate GitHub backend in this repository does not implement that same session contract. Its original protected routes used a shared `x-linc-api-key` and request-body `userId`.
 
-Therefore, do **not** simply pass the archive's bearer token to this backend, assume the archive is the approved client, or assume its JSON session database is shared/durable on Vercel.
+Therefore, do **not** simply pass the archive's bearer token to this backend, assume the archive is the approved client, assume its JSON session database is shared/durable on Vercel, or use its placeholder `APP_URL` to configure CORS. The archive's relative API calls imply same-origin behavior for that archive only; they do not show that it is integrated with this separate backend.
 
 ## Required follow-up
 
@@ -73,7 +74,7 @@ These tests prove behavior of the interim guard and controller logic; they do no
 ### CORS allowlist hardening — latest Runtime change
 - `server.js` now reads `LINC_ALLOWED_ORIGINS` as a comma-separated list of exact `scheme://host[:port]` origins. Requests with an `Origin` header receive CORS permission only for an exact, valid allowlist match; wildcard origins, URL paths, and non-HTTP(S) values are not accepted.
 - If `LINC_ALLOWED_ORIGINS` is absent or empty, browser origins receive no CORS grant. Requests without an `Origin` header (such as server-to-server calls) continue to work. CORS is not authentication; the end-user identity gate remains required.
-- The read-only Vercel environment inventory did not show `LINC_ALLOWED_ORIGINS` configured for Preview. No origin was guessed or inserted. A browser-based Client will require its approved exact origin to be configured before cross-origin requests can work; this remains pending confirmation of the actual Client domain.
+- The read-only Vercel environment inventory did not show `LINC_ALLOWED_ORIGINS` configured for Preview. No origin was guessed or inserted. A browser Client that calls this separate backend cross-origin will need its approved exact origin configured first. The inspected, unconfirmed client archive uses relative same-origin API paths and a placeholder `APP_URL`; it cannot establish this backend's required CORS origin or even prove it calls this backend.
 - Local Sandbox verification on the Runtime change passed **37/37 tests**, including CORS preflight coverage, and `npm audit` reported 0 vulnerabilities. GitHub Actions run #107 passed for exact Runtime/test commit `70c9366`.
 
 ### Vercel deployment quota mitigation
@@ -87,7 +88,7 @@ These tests prove behavior of the interim guard and controller logic; they do no
 ### Vercel environment metadata inventory — values not decrypted
 - A read-only Vercel environment listing was performed with decryption disabled; no environment values were displayed or changed.
 - The listing showed `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, and `LINC_API_KEY` targeted to **Preview**. This result did not show those keys targeted to Production. Treat Production database configuration as **not verified** from the current inventory rather than assuming it is configured.
-- `LINC_ALLOWED_ORIGINS` was not present in the inventory. Until the approved web-client origin is confirmed and configured for Preview, browser CORS requests will remain denied by the new allowlist.
+- `LINC_ALLOWED_ORIGINS` was not present in the inventory. Until the approved architecture and origin are confirmed and configured for Preview, cross-origin browser requests to this separate backend remain denied by the new allowlist. The inspected unconfirmed archive uses relative same-origin API paths, so it does not supply the value needed here.
 - A generic Preview `CRON_SECRET` and another branch-specific Preview `CRON_SECRET` were listed; the branch-specific entry targets `fix/vercel-readonly-filesystem`, not this guarded review branch. The cron handler remains a placeholder and is not configured in the current `vercel.json` routes.
 - No secret values were requested, decrypted, printed, or edited. This metadata inventory does not prove which Supabase project the Preview URL points to, and it does not prove database separation from Production. Do not run live CRUD until the intended Preview project is independently confirmed.
 
