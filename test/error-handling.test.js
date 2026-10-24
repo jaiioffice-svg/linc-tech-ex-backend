@@ -1,6 +1,8 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const app = require('../server');
+const express = require('express');
+const { errorHandler } = require('../error-handler');
 
 let server;
 let baseUrl;
@@ -90,4 +92,49 @@ test('unknown routes return a stable JSON 404 instead of an HTML stack page', as
         code: 'ROUTE_NOT_FOUND',
         message: 'The requested route was not found'
     });
+});
+
+test('unexpected errors produce a generic 500 response without leaking exception details', async () => {
+    const testApp = express();
+
+    testApp.get('/trigger-unexpected-error', () => {
+        throw new Error('private-diagnostic-token');
+    });
+    testApp.use(errorHandler);
+
+    const testServer = testApp.listen(0, '127.0.0.1');
+
+    await new Promise((resolve, reject) => {
+        testServer.once('listening', resolve);
+        testServer.once('error', reject);
+    });
+
+    const url = `http://127.0.0.1:${testServer.address().port}/trigger-unexpected-error`;
+    const originalConsoleError = console.error;
+    const capturedLogs = [];
+    console.error = (...args) => capturedLogs.push(args.join(' '));
+
+    try {
+        const response = await fetch(url);
+        const body = await response.json();
+        const serialized = JSON.stringify(body);
+
+        assert.equal(response.status, 500);
+        assert.deepEqual(body, {
+            success: false,
+            code: 'INTERNAL_ERROR',
+            message: 'Internal server error'
+        });
+        assert.equal(serialized.includes('private-diagnostic-token'), false);
+        assert.equal(serialized.includes('stack'), false);
+        assert.equal(
+            capturedLogs.join(' ').includes('private-diagnostic-token'),
+            false
+        );
+    } finally {
+        console.error = originalConsoleError;
+        await new Promise((resolve, reject) => {
+            testServer.close(error => error ? reject(error) : resolve());
+        });
+    }
 });
