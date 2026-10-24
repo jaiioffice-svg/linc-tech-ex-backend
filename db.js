@@ -107,7 +107,7 @@ function normalizeSupabaseUser(row) {
         ...data,
         userId: row.user_id,
         grade: row.grade || data.grade || 'M1',
-        guardianLineId: row.guardian_line_id ?? data.guardianLineId ?? null,
+        guardianLineId: row.guardian_line_id !== undefined ? row.guardian_line_id : (data.guardianLineId ?? null),
         createdAt: row.created_at ?? data.createdAt,
         lastHeartbeat: row.last_heartbeat ?? data.lastHeartbeat ?? null,
         status: row.status || data.status
