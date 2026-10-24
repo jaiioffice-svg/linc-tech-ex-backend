@@ -7,8 +7,12 @@ create table if not exists public.linc_notification_outbox (
     recipient_line_id text null,
     event_type text not null
         check (event_type in ('APP_TERMINATION_SIGNAL')),
-    event_status text not null default 'pending'
+    event_status text not null default 'blocked'
         check (event_status in ('pending', 'blocked', 'processing', 'retry', 'sent', 'dead')),
+    constraint linc_notification_outbox_recipient_status_check check (
+        (event_status = 'blocked' and recipient_line_id is null) or
+        (event_status in ('pending', 'processing', 'retry', 'sent', 'dead') and recipient_line_id is not null)
+    ),
     attempts integer not null default 0 check (attempts >= 0),
     next_attempt_at timestamptz not null default now(),
     last_error_code text null,
@@ -40,8 +44,6 @@ declare
     v_user public.linc_users%rowtype;
     v_deleted_at bigint;
     v_event_id uuid;
-    v_event_status text;
-    v_guardian_linked boolean;
     v_profile_data jsonb;
 begin
     if p_user_id is null
@@ -70,7 +72,6 @@ begin
 
     -- A legacy profile field does not prove provider-verified pairing or consent.
     -- Keep all termination notices blocked until a reviewed verification contract exists.
-    v_guardian_linked := false;
 
     v_profile_data := case
         when jsonb_typeof(v_user.data) = 'object' then v_user.data
@@ -90,7 +91,7 @@ begin
             'alreadyRecorded', true,
             'eventId', null,
             'eventStatus', null,
-            'guardianLinked', v_guardian_linked
+            'guardianLinked', false
         );
     end if;
 
@@ -105,10 +106,6 @@ begin
            )
      where user_id = p_user_id;
 
-    v_event_status := case
-        when v_guardian_linked then 'pending'
-        else 'blocked'
-    end;
 
     insert into public.linc_notification_outbox (
         user_id,
@@ -118,9 +115,9 @@ begin
         payload
     ) values (
         p_user_id,
-        case when v_guardian_linked then v_user.guardian_line_id else null end,
+        null,
         'APP_TERMINATION_SIGNAL',
-        v_event_status,
+        'blocked',
         jsonb_build_object('reason', 'APP_TERMINATION_SIGNAL')
     )
     returning event_id into v_event_id;
@@ -130,8 +127,8 @@ begin
         'alreadyRecorded', false,
         'deletedAt', v_deleted_at,
         'eventId', v_event_id,
-        'eventStatus', v_event_status,
-        'guardianLinked', v_guardian_linked
+        'eventStatus', 'blocked',
+        'guardianLinked', false
     );
 end;
 $$;
