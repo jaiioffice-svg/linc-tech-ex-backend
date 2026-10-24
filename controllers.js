@@ -10,16 +10,35 @@ function sendError(res, error, action) {
     return res.status(status).json({ success: false, message });
 }
 
-exports.handleUserRegistration = async (req, res) => {
-    try {
-        const { userId, grade } = req.body || {};
-        if (typeof userId !== 'string' || !userId.trim()) {
-            return res.status(400).json({ success: false, message: 'Missing core identifier' });
-        }
-        if (userId.length > 200) {
-            return res.status(400).json({ success: false, message: 'Invalid user identifier' });
-        }
+// Controllers trust only a principal set by reviewed server-side authentication
+// middleware. Body-supplied identifiers are consistency checks, never identity.
+function getAuthenticatedUserId(req, res) {
+    const authenticatedUserId = req && req.auth && req.auth.userId;
+    if (typeof authenticatedUserId !== 'string' ||
+        !authenticatedUserId.trim() ||
+        authenticatedUserId.length > 200) {
+        res.status(401).json({ success: false, message: 'Verified user identity is required' });
+        return null;
+    }
 
+    const requestedUserId = req.body && req.body.userId;
+    if (requestedUserId !== undefined && requestedUserId !== authenticatedUserId) {
+        res.status(403).json({
+            success: false,
+            message: 'Requested user does not match authenticated identity'
+        });
+        return null;
+    }
+
+    return authenticatedUserId;
+}
+
+exports.handleUserRegistration = async (req, res) => {
+    const userId = getAuthenticatedUserId(req, res);
+    if (!userId) return;
+
+    try {
+        const { grade } = req.body || {};
         const existingUser = await getUser(userId);
         const user = existingUser || {
             userId,
@@ -43,17 +62,14 @@ exports.handleUserRegistration = async (req, res) => {
     }
 };
 
-// Keep the existing mobile-app heartbeat endpoint while using Supabase persistence.
+// Keep the existing heartbeat endpoint while using Supabase persistence.
+// The profile key is always derived from the authenticated principal.
 exports.handleHeartbeat = async (req, res) => {
-    try {
-        const { userId, grade } = req.body || {};
-        if (typeof userId !== 'string' || !userId.trim()) {
-            return res.status(400).json({ success: false, message: 'Missing core identifier' });
-        }
-        if (userId.length > 200) {
-            return res.status(400).json({ success: false, message: 'Invalid user identifier' });
-        }
+    const userId = getAuthenticatedUserId(req, res);
+    if (!userId) return;
 
+    try {
+        const { grade } = req.body || {};
         const now = Date.now();
         const existingUser = await getUser(userId);
         const user = existingUser || {
@@ -84,15 +100,10 @@ exports.handleHeartbeat = async (req, res) => {
 };
 
 exports.handleImmediateDelete = async (req, res, triggerAlertCallback) => {
-    try {
-        const { userId } = req.body || {};
-        if (typeof userId !== 'string' || !userId.trim()) {
-            return res.status(400).json({ success: false, message: 'Missing core identifier' });
-        }
-        if (userId.length > 200) {
-            return res.status(400).json({ success: false, message: 'Invalid user identifier' });
-        }
+    const userId = getAuthenticatedUserId(req, res);
+    if (!userId) return;
 
+    try {
         const targetUser = await getUser(userId);
         if (!targetUser) {
             return res.status(404).json({ success: false, message: 'Target profile not found' });
