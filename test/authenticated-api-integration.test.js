@@ -199,6 +199,7 @@ test('authenticated registration API integration with isolated Supabase boundary
             grade: 'M1',
             guardianLineId: null,
             createdAt: calls[2].body.created_at,
+            lastHeartbeat: null,
             status: 'active'
         },
         updated_at: calls[2].body.updated_at
