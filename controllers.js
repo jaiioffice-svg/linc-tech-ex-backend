@@ -1,4 +1,4 @@
-const { getUser, saveUser } = require('./db');
+const { getUser, saveUser, recordAppTermination } = require('./db');
 
 function sendError(res, error, action) {
     const status = error && (error.code === 'DB_NOT_CONFIGURED' || error.code === 'DB_UNAVAILABLE') ? 503 : 500;
@@ -104,32 +104,40 @@ exports.handleImmediateDelete = async (req, res, triggerAlertCallback) => {
     if (!userId) return;
 
     try {
-        const targetUser = await getUser(userId);
-        if (!targetUser) {
-            return res.status(404).json({ success: false, message: 'Target profile not found' });
+        // Profile state and its notification outbox record are committed atomically
+        // by the durable database RPC (or one local-file write in development).
+        const result = await recordAppTermination(userId);
+
+        if (!result.found) {
+            return res.status(404).json({
+                success: false,
+                message: 'Target profile not found'
+            });
         }
 
-        const alreadyRecorded = targetUser.status === 'app_deleted';
-
-        if (!alreadyRecorded) {
-            targetUser.status = 'app_deleted';
-            targetUser.deletedAt = Date.now();
-            await saveUser(targetUser);
-
-            // The current callback records a pending event; real delivery needs an outbox.
-            if (typeof triggerAlertCallback === 'function') {
+        if (!result.alreadyRecorded && typeof triggerAlertCallback === 'function') {
+            try {
                 triggerAlertCallback({
-                    userId,
-                    guardianLineId: targetUser.guardianLineId || null,
-                    reason: 'APP_TERMINATION_SIGNAL'
+                    eventId: result.eventId,
+                    reason: 'APP_TERMINATION_SIGNAL',
+                    eventStatus: result.eventStatus,
+                    guardianLinked: result.guardianLinked
                 });
+            } catch (callbackError) {
+                // The outbox entry is already durable; callback/logging failure must
+                // not undo or misreport the committed termination transition.
+                console.error(
+                    '[ALERT_OUTBOX_CALLBACK]',
+                    callbackError && callbackError.code ? callbackError.code : 'CALLBACK_FAILED'
+                );
             }
         }
 
         return res.status(200).json({
             success: true,
-            alreadyRecorded,
-            message: alreadyRecorded
+            alreadyRecorded: result.alreadyRecorded,
+            notificationStatus: result.eventStatus || (result.alreadyRecorded ? 'already_recorded' : null),
+            message: result.alreadyRecorded
                 ? 'Termination event already recorded'
                 : 'Termination event recorded'
         });
