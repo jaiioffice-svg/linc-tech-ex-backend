@@ -98,3 +98,17 @@ test('heartbeat rejects an oversized user identifier before database access', as
     assert.equal(body.message, 'Invalid user identifier');
     delete process.env.LINC_API_KEY;
 });
+
+test('termination signal rejects an oversized user identifier before database access', async () => {
+    process.env.LINC_API_KEY = 'test-only-key';
+    const response = await fetch(`${baseUrl}/api/alert/delete`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', 'x-linc-api-key': 'test-only-key' },
+        body: JSON.stringify({ userId: 'u'.repeat(201) })
+    });
+    const body = await response.json();
+    assert.equal(response.status, 400);
+    assert.equal(body.success, false);
+    assert.equal(body.message, 'Invalid user identifier');
+    delete process.env.LINC_API_KEY;
+});
