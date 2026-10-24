@@ -239,9 +239,9 @@ Vercel project environment-variable metadata was retrieved for project `linc-tec
 - No `LINC_INTERNAL_AUTH_SECRET` or `LINC_ALLOWED_ORIGINS` appears in the returned project inventory.
 No environment-variable values were decrypted, read, created, or changed. The target Supabase project identity remains unknown because the URL value was intentionally not read; therefore Preview-vs-Production database isolation is still unproven. With no configured `LINC_INTERNAL_AUTH_SECRET`, the Candidate's protected route identity verifier would fail closed with HTTP 503 if deployed as-is.
 
-Latest read-only Production GETs at 09:22 UTC again returned HTTP 500 `FUNCTION_INVOCATION_FAILED`:
-- `GET /health`: request ID `sin1::vnrtl-1792833730755-752ce94541ad`
-- `GET /ready`: request ID `sin1::2jmpn-1792833731860-95b962b160ed`
+Latest read-only Production GETs at 09:35 UTC (16:35 Thailand) again returned HTTP 500 `FUNCTION_INVOCATION_FAILED`:
+- `GET /health`: request ID `sin1::w4ckm-1792834501032-aae3fb33e164`
+- `GET /ready`: request ID `sin1::nggdm-1792834502180-2e06801f77d4`
 
 Vercel's active Production deployment remains `dpl_2ELeGpWoXTL6wFFvLEXxrLZzRgAk` from `main` SHA `336e2fcdd1b9f0841432817dcafe955b45700eef`. The Candidate remains Draft/unmerged with automatic deployments paused on its branch. No Production code/settings, credentials, SQL, persistent data, or notifications were changed.
 
