@@ -36,6 +36,7 @@ function requireVerifiedEndUser(req, res, next) {
         typeof authenticatedUserId !== 'string' ||
         !authenticatedUserId.trim() ||
         authenticatedUserId !== authenticatedUserId.trim() ||
+        /[\x00-\x1F\x7F]/.test(authenticatedUserId) ||
         authenticatedUserId.length > 200
     ) {
         return res.status(503).json({
