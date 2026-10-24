@@ -56,10 +56,16 @@ These tests prove behavior of the interim guard and controller logic; they do no
 - Do not select or add an identity provider speculatively.
 - Do not interpret a passing health check, readiness check, mocked test, or successful build as proof that end-user authorization is secure.
 
-## Evidence currently available
+## Latest verified evidence — 2026-10-24
 
-- Candidate commit before interim guard: `d476e4546a15bf448e00a4d4946f9371ee809d5b`; GitHub Actions reported 28/28 tests passing.
-- Latest-commit Preview deployment before the guard: https://linc-tech-ex-backend-3jpyist9s-linc8.vercel.app
-- In an isolated Vercel Sandbox at the candidate commit, `npm ci` passed (85 packages), `npm test` passed (28/28), and health endpoints responded HTTP 200.
-- Preview `/ready` returned HTTP 200 on that pre-guard candidate, demonstrating database connectivity only. The Preview database has not yet been proven isolated from Production, so no live CRUD was run.
-- The changes described above are a security mitigation in the draft branch. They must be re-tested and Preview-deployed before their behavior is considered verified.
+- Latest Draft PR #2 head before this documentation refresh: `eedaa6c67c4911c44c6a13bed860020cd27a724a`.
+- GitHub Actions Backend checks run [#81](https://github.com/jaiioffice-svg/linc-tech-ex-backend/actions/runs/40066202748) completed successfully for that exact commit.
+- In the isolated Vercel Sandbox, a fresh `npm ci --no-audit --no-fund` passed (85 packages), `npm test` passed (**33/33 tests**), and `npm audit --omit=dev` reported **0 production dependency vulnerabilities**.
+- The runtime smoke was run against the guarded implementation at `1cd1efb8cef9ff3d5f0f832283e61e760d9ba29d`; the only later code change through `eedaa6c` was a test-only regression for JSON `auth.userId` spoofing. `GET /health` returned HTTP 200. Heartbeat, register, and alert/delete returned HTTP 503 when no verified principal was attached, including requests that supplied a body `auth: { userId: ... }`. Guard rejection happened before database access.
+- Latest guarded candidate deployment has **not** been confirmed. Vercel refused a new deployment with HTTP 402 `payment_required`, resource `api-deployments-free-per-day`, retry-after approximately 24 hours. The existing READY Preview URL above is commit `d476e4546a15bf448e00a4d4946f9371ee809d5b`, from before the guard; it is not verification of the guarded code.
+- The client-session review branch describes the inspected archive only. It has not established the approved/deployed client source, so no identity provider or session contract has been guessed or wired in.
+- No live registration/read-back, Supabase CRUD, migrations, LINE delivery, Production calls, Production environment changes, or merge/promotion were performed. Preview database isolation from Production remains unconfirmed.
+
+## Release decision
+
+The interim guard and its regression tests are verified in the CI/Sandbox boundary described above, but the full identity/session implementation and a Preview deployment of the guarded commit remain unverified. Keep PR #2 in Draft/unmerged state and Issue #22 open until the approved client contract is confirmed, server-side identity verification and owner isolation are implemented, and the guarded commit is deployed and tested against a confirmed isolated Preview database.
