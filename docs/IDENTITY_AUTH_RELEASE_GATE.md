@@ -328,3 +328,21 @@ Important boundary: this run used mocked Supabase REST replies plus static migra
 Vercel identifies the active Production deployment as `dpl_2ELeGpWoXTL6wFFvLEXxrLZzRgAk`, from `main` SHA `336e2fcdd1b9f0841432817dcafe955b45700eef`. Request-specific Runtime Logs returned no entries; a wider two-hour log query was rejected because it exceeded the Hobby plan's retention window. The grouped Runtime Errors query also returned no clusters in its selected range. Neither absence of log records nor absence of grouped errors changes the direct HTTP 500 result. Controlled fault injection previously reproduced the suspected `EROFS` failure on the exact `main` module-import chain, but that is not a Production stack trace.
 
 PR #2 remains Draft/unmerged and automatic deployment from the Candidate branch remains paused. This work did not deploy code, change Production settings/secrets, execute SQL, write database rows, bypass Preview SSO, or send LINE notifications.
+
+
+## Embedded PostgreSQL replay migration integration test — 2026-10-24
+
+The Candidate now includes `@electric-sql/pglite` as a development dependency and `test/replay-migration-postgres.test.js`. Unlike the earlier static migration-contract test, this test executes the actual `20261024_003_auth_assertion_replay.sql` inside an ephemeral PostgreSQL-compatible engine and checks:
+- migration application creates the function/table successfully;
+- first JTI use returns true and replay returns false;
+- expired assertion is rejected with SQLSTATE `22023`;
+- expired replay records are pruned;
+- `anon` cannot select the replay table or execute the consume function;
+- `service_role` can execute the RPC; and
+- RLS is enabled on the replay table.
+
+Exact Candidate code/test commit `e117545e7333d96f91f1881165290f37b7aa7c27` passed **72/72 tests** in a clean isolated Vercel Sandbox, `npm ci` installed 86 packages, `npm audit` found 0 vulnerabilities, syntax checks/Vercel config-scope/diff checks passed, and GitHub Actions [run #281](https://github.com/jaiioffice-svg/linc-tech-ex-backend/actions/runs/40081403065) succeeded.
+
+Boundary: this is an embedded PostgreSQL-compatible test, not a live Supabase test. It does not confirm hosted PostgREST routing, credentials, real project settings, or compatibility with the target project's existing grants/RLS. The migration remains unapplied to Supabase and to any persistent database. The Vercel environment metadata check is blocked by team-scope authorization; a one-time consent link has been generated and must be approved by a team member before we can retry a read-only metadata listing. No variable values were decrypted or modified.
+
+PR #2 remains Draft/unmerged and branch auto-deploy remains paused. Production remains on `main` SHA `336e2fcdd1b9f0841432817dcafe955b45700eef`, and the last direct GET probe at 09:04 UTC returned HTTP 500 from both `/health` and `/ready`. No Production changes, persistent database migrations/writes, secrets or live notifications were performed.
