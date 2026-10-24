@@ -138,6 +138,14 @@ function createInternalAssertionMiddleware({ consumeAssertionId = consumeInterna
             return rejectAssertion(res);
         }
 
+        const requestedUserId = req.body && req.body.userId;
+        if (requestedUserId !== undefined && requestedUserId !== claims.sub) {
+            return res.status(403).json({
+                success: false,
+                message: 'Requested user does not match authenticated identity'
+            });
+        }
+
         let consumed;
         try {
             consumed = await consumeAssertionId(claims.jti, claims.exp);
