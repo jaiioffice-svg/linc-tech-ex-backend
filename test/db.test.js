@@ -211,6 +211,114 @@ test('getUser rejects a successful response with the wrong JSON shape as DB_UNAV
     }
 });
 
+test('consumeInternalAssertion calls the atomic Supabase RPC with only jti and expiry', async () => {
+    const db = require('../db');
+    const originalFetch = global.fetch;
+    let requestUrl;
+    let requestOptions;
+
+    global.fetch = async (url, options) => {
+        requestUrl = String(url);
+        requestOptions = options;
+        return new Response('true', {
+            status: 200,
+            headers: { 'content-type': 'application/json' }
+        });
+    };
+
+    try {
+        await withEnv({
+            VERCEL: '1',
+            VERCEL_ENV: 'preview',
+            SUPABASE_URL: 'https://example-project.supabase.co',
+            SUPABASE_SERVICE_ROLE_KEY: 'sb_secret_test_only'
+        }, async () => {
+            assert.equal(
+                await db.consumeInternalAssertion('assertion-id-000001', 1792831500),
+                true
+            );
+            assert.match(requestUrl, /\/rest\/v1\/rpc\/linc_consume_auth_assertion$/);
+            assert.equal(requestOptions.method, 'POST');
+            assert.equal(requestOptions.headers.Prefer, 'return=representation');
+            assert.ok(requestOptions.signal instanceof AbortSignal);
+            assert.deepEqual(JSON.parse(requestOptions.body), {
+                p_jti: 'assertion-id-000001',
+                p_expires_at: 1792831500
+            });
+        });
+    } finally {
+        global.fetch = originalFetch;
+    }
+});
+
+test('consumeInternalAssertion returns false when the database reports a replay', async () => {
+    const db = require('../db');
+    const originalFetch = global.fetch;
+
+    global.fetch = async () => new Response('false', {
+        status: 200,
+        headers: { 'content-type': 'application/json' }
+    });
+
+    try {
+        await withEnv({
+            VERCEL: '1',
+            VERCEL_ENV: 'preview',
+            SUPABASE_URL: 'https://example-project.supabase.co',
+            SUPABASE_SERVICE_ROLE_KEY: 'sb_secret_test_only'
+        }, async () => {
+            assert.equal(
+                await db.consumeInternalAssertion('assertion-id-000001', 1792831500),
+                false
+            );
+        });
+    } finally {
+        global.fetch = originalFetch;
+    }
+});
+
+test('consumeInternalAssertion fails closed when durable Supabase configuration is missing', async () => {
+    const db = require('../db');
+
+    await withEnv({
+        VERCEL: undefined,
+        VERCEL_ENV: undefined,
+        SUPABASE_URL: undefined,
+        SUPABASE_SERVICE_ROLE_KEY: undefined
+    }, async () => {
+        await assert.rejects(
+            db.consumeInternalAssertion('assertion-id-000001', 1792831500),
+            error => error.code === 'DB_NOT_CONFIGURED'
+        );
+    });
+});
+
+test('consumeInternalAssertion rejects a malformed RPC response', async () => {
+    const db = require('../db');
+    const originalFetch = global.fetch;
+
+    global.fetch = async () => new Response('{"accepted":true}', {
+        status: 200,
+        headers: { 'content-type': 'application/json' }
+    });
+
+    try {
+        await withEnv({
+            VERCEL: '1',
+            VERCEL_ENV: 'preview',
+            SUPABASE_URL: 'https://example-project.supabase.co',
+            SUPABASE_SERVICE_ROLE_KEY: 'sb_secret_test_only'
+        }, async () => {
+            await assert.rejects(
+                db.consumeInternalAssertion('assertion-id-000001', 1792831500),
+                error => error.code === 'DB_UNAVAILABLE'
+            );
+        });
+    } finally {
+        global.fetch = originalFetch;
+    }
+});
+
 test('saveUser persists a profile using a Supabase upsert', async () => {
     const db = require('../db');
     const originalFetch = global.fetch;
