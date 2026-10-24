@@ -79,3 +79,18 @@ test('valid payload values pass validation without setting an authenticated iden
     assert.equal(result.res.statusCode, 200);
     assert.equal(result.nextCalled, true);
 });
+
+test('unknown fields such as guardianLineId, auth, and role are rejected', () => {
+    for (const body of [
+        { guardianLineId: 'client-supplied-line-id' },
+        { auth: { userId: 'client-selected-user' } },
+        { role: 'admin' },
+        { userId: 'known-user', grade: 'M1', isAdmin: true }
+    ]) {
+        const result = invoke(body);
+
+        assert.equal(result.res.statusCode, 400);
+        assert.equal(result.res.body.code, 'UNSUPPORTED_FIELD');
+        assert.equal(result.nextCalled, false);
+    }
+});
