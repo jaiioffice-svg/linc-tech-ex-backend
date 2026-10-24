@@ -233,3 +233,13 @@ The Candidate now applies an 8-second AbortSignal timeout to Supabase REST reque
 Latest Runtime/test commit `e9eb8f10d9704684fd26dc66910a2fb2fa244942` passed **43/43 tests** in an isolated Vercel Sandbox; `npm audit` reported 0 vulnerabilities; `node --check server.js`, `node --check db.js`, Vercel config/scope validation and `git diff --check` passed. GitHub Actions [run #157](https://github.com/jaiioffice-svg/linc-tech-ex-backend/actions/runs/40076735927) succeeded. Additional tests cover sanitized malformed-JSON 400, oversize-payload 413, unknown-route 404, Supabase transport timeout normalization, and invalid upstream JSON normalization.
 
 These are local/Sandbox regressions only. They do not prove real Preview Supabase connectivity or user-session authentication. Production was last read-only checked at 07:47 UTC (14:47 Thai time) and still returned HTTP 500 `FUNCTION_INVOCATION_FAILED` on `/health` and `/ready`. Keep the Candidate Draft/unmerged and the review branch deployment pause in place. No Production deployment, SQL, CRUD, environment changes, secrets decryption, or live notifications were performed.
+
+
+
+## Protected API input validation — 2026-10-24
+
+The Candidate now loads `request-validation.js` after the service-key and verified-principal gates on registration, heartbeat and app-delete routes. It rejects null/array bodies, non-string or blank body `userId`, `userId` longer than 200 characters, non-string `grade`, and `grade` longer than 32 characters with stable HTTP 400 codes. It never uses body `userId` as the authenticated identity. The shared error middleware is isolated in `error-handler.js`; `db.js` applies an 8-second Supabase request timeout and normalizes timeout/network/invalid-response failures to a generic 503-class database error.
+
+Latest Candidate Runtime/test commit `5a1ae892f37df094fddd65666d397cb7325431b5` passed **49/49 tests** in an isolated Sandbox; `npm audit` reported 0 vulnerabilities; `node --check` passed for `server.js`, `db.js`, `error-handler.js` and `request-validation.js`; Vercel config/scope and `git diff --check` passed. GitHub Actions [run #175](https://github.com/jaiioffice-svg/linc-tech-ex-backend/actions/runs/40077023815) succeeded. Latest documentation reflects the payload-validation and timeout/error policy in `docs/ARCHITECTURE.md`.
+
+This does not resolve the Client/server bearer-session mismatch. The inspected Client archive sends an opaque Authorization Bearer token to its own `/api/...` routes; this backend uses a separate service key and waits for a trusted principal. The archive is not confirmed as the approved deployed Client, so no provider or session bridge has been guessed or implemented.
