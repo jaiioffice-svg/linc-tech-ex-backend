@@ -14,7 +14,7 @@ This is the proposed server-to-server contract for the Candidate branch. It has 
 
 ## Required environment variables
 
-- `LINC_API_KEY`: distinct random secret shared only between BFF and Backend servers.
+- `LINC_API_KEY`: distinct cryptographically random secret of at least 32 UTF-8 bytes, shared only between BFF and Backend servers. The Backend fails closed with HTTP 503 if it is missing or undersized.
 - `LINC_INTERNAL_AUTH_SECRET`: independent random secret of at least 32 bytes, shared only by the BFF signer and Backend verifier.
 - `LINC_BACKEND_URL`: server-side BFF configuration containing the reviewed Backend base URL.
 
