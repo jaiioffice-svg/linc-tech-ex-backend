@@ -47,8 +47,8 @@ test('null and array request bodies are rejected as invalid objects', () => {
     }
 });
 
-test('userId must be a non-empty string no longer than 200 characters', () => {
-    const invalidValues = ['', '   ', 42, null, 'u'.repeat(201)];
+test('userId must be a canonical non-empty trimmed string no longer than 200 characters', () => {
+    const invalidValues = ['', '   ', ' padded-user ', 42, null, 'u'.repeat(201)];
 
     for (const userId of invalidValues) {
         const result = invoke({ userId });
@@ -59,8 +59,8 @@ test('userId must be a non-empty string no longer than 200 characters', () => {
     }
 });
 
-test('grade must be a string no longer than 32 characters when supplied', () => {
-    const invalidValues = [42, null, {}, 'g'.repeat(33)];
+test('grade must be a non-empty trimmed string no longer than 32 characters when supplied', () => {
+    const invalidValues = ['', '   ', ' M1 ', 42, null, {}, 'g'.repeat(33)];
 
     for (const grade of invalidValues) {
         const result = invoke({ grade });
