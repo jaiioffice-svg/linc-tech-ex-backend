@@ -5,6 +5,13 @@
 
 ## Executive status
 
+### Production crash root cause — confirmed from Vercel runtime logs
+
+A read-only runtime-log lookup for the latest Production `GET /health` request (2026-10-24 10:45:09 UTC, request ID `v7whp-1792838708760-994e2fe731a8`) returned the actual stack trace: `EROFS: read-only file system, open '/var/task/linc_data.json'` from `/var/task/db.js:6:8` during module import. The active Production deployment is `dpl_2ELeGpWoXTL6wFFvLEXxrLZzRgAk`, from `main` SHA `336e2fcdd1b9f0841432817dcafe955b45700eef`. This confirms the immediate HTTP 500 root cause; it is no longer just a hypothesis.
+
+The Candidate removes the import-time JSON file write and adds a configured Supabase adapter, but the Candidate is not deployed. The read-only Vercel environment inventory previously showed the Supabase URL/service-role variables as Preview-only, not Production; do not claim a fixed Production service until the persistence configuration and authenticated user/BFF integration are approved and verified. Removing the import-time write alone would not make the old JSON-backed API durable on a read-only serverless filesystem.
+
+
 - **Estimated path-to-MVP completion: about 30% done / 70% remaining.** This is a weighted estimate of release gates, not a count of code lines or commits.
 - **Current Production service: NOT operational.** A read-only probe returned HTTP 500 `FUNCTION_INVOCATION_FAILED` from both `/health` and `/ready` at 2026-10-24 10:45 UTC. The active Production deployment is still `dpl_2ELeGpWoXTL6wFFvLEXxrLZzRgAk`, from `main` SHA `336e2fcdd1b9f0841432817dcafe955b45700eef`.
 - Candidate PR #2 remains **Draft and unmerged**. The code branch has not been validated as a deployed end-to-end release. No Production deployment/configuration or persistent DB was changed.
