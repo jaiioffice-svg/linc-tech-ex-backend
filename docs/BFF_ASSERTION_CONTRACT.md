@@ -14,11 +14,11 @@ This is the proposed server-to-server contract for the Candidate branch. It has 
 
 ## Required environment variables
 
-- `LINC_API_KEY`: distinct cryptographically random secret of at least 32 UTF-8 bytes, shared only between BFF and Backend servers. The Backend fails closed with HTTP 503 if it is missing or undersized.
-- `LINC_INTERNAL_AUTH_SECRET`: independent random secret of at least 32 bytes, shared only by the BFF signer and Backend verifier.
+- `LINC_API_KEY`: distinct cryptographically random secret of at least 32 UTF-8 bytes, shared only between BFF and Backend servers. It must not have leading/trailing whitespace or ASCII control characters; the Backend fails closed with HTTP 503 if the value is missing, undersized, padded, or malformed.
+- `LINC_INTERNAL_AUTH_SECRET`: independent random secret of at least 32 bytes, shared only by the BFF signer and Backend verifier. It must not have leading/trailing whitespace or ASCII control characters.
 - `LINC_BACKEND_URL`: server-side BFF configuration containing the reviewed Backend base URL.
 
-Do not reuse the session token as either secret. Do not expose these values in client environment variables prefixed for public exposure, compiled bundles, logs, URLs, or error responses. The Candidate currently fails closed with HTTP 503 if `LINC_INTERNAL_AUTH_SECRET` is absent or shorter than 32 bytes.
+Do not reuse the session token as either secret. Do not expose these values in client environment variables prefixed for public exposure, compiled bundles, logs, URLs, or error responses. The Candidate fails closed with HTTP 503 if `LINC_INTERNAL_AUTH_SECRET` is absent, shorter than 32 bytes, padded with leading/trailing whitespace, or contains ASCII control characters.
 
 ## Assertion claims
 
