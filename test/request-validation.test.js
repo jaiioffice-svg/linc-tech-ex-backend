@@ -17,8 +17,9 @@ function mockResponse() {
     };
 }
 
-function invoke(body) {
+function invoke(body, requestPath) {
     const req = body === undefined ? {} : { body };
+    if (requestPath !== undefined) req.path = requestPath;
     const res = mockResponse();
     let nextCalled = false;
 
@@ -93,4 +94,12 @@ test('unknown fields such as guardianLineId, auth, and role are rejected', () =>
         assert.equal(result.res.body.code, 'UNSUPPORTED_FIELD');
         assert.equal(result.nextCalled, false);
     }
+});
+
+test('delete route rejects grade because it is not part of that route contract', () => {
+    const result = invoke({ userId: 'valid-user', grade: 'M1' }, '/api/v1/alert/delete');
+
+    assert.equal(result.res.statusCode, 400);
+    assert.equal(result.res.body.code, 'UNSUPPORTED_FIELD');
+    assert.equal(result.nextCalled, false);
 });
