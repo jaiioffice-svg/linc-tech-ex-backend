@@ -102,6 +102,25 @@ test('missing or too-short internal assertion secret fails closed with 503', asy
     }
 });
 
+test('padded or control-containing internal assertion secrets fail closed', async () => {
+    const invalidSecrets = [
+        ' ' + SECRET,
+        SECRET + ' ',
+        SECRET + String.fromCharCode(10),
+        SECRET.slice(0, 16) + String.fromCharCode(1) + SECRET.slice(16)
+    ];
+
+    for (const secret of invalidSecrets) {
+        const result = await run(signAssertion(), { secret });
+        assert.equal(result.res.statusCode, 503);
+        assert.equal(
+            result.res.body.message,
+            'End-user identity verification is not configured'
+        );
+        assert.equal(result.nextCalled, false);
+    }
+});
+
 test('valid short-lived assertion establishes only the verified principal fields', async () => {
     const req = mockRequest(signAssertion());
     req.body = { userId: 'verified-user-123', auth: { userId: 'spoofed-id' } };
