@@ -78,3 +78,39 @@ test('new Supabase secret API keys are sent as apikey, not as a Bearer JWT', asy
         }
     }
 });
+
+
+test('getUser strictly encodes punctuation in untrusted PostgREST filter values', async () => {
+    const previousEnv = {
+        SUPABASE_URL: process.env.SUPABASE_URL,
+        SUPABASE_SERVICE_ROLE_KEY: process.env.SUPABASE_SERVICE_ROLE_KEY,
+        VERCEL: process.env.VERCEL,
+        VERCEL_ENV: process.env.VERCEL_ENV
+    };
+    const previousFetch = global.fetch;
+    let requestedUrl = '';
+    process.env.SUPABASE_URL = 'https://example.supabase.co';
+    process.env.SUPABASE_SERVICE_ROLE_KEY = 'sb_secret_test-only';
+    delete process.env.VERCEL;
+    delete process.env.VERCEL_ENV;
+    global.fetch = async url => {
+        requestedUrl = String(url);
+        return new Response('[]', {
+            status: 200,
+            headers: { 'content-type': 'application/json' }
+        });
+    };
+
+    try {
+        const { getUser } = require('../db');
+        await getUser("attacker')or(status.eq.active");
+        assert.match(requestedUrl, /user_id=eq\\.attacker%27%29or%28status\\.eq\\.active/);
+        assert.doesNotMatch(requestedUrl, /user_id=eq\\.attacker'\\)or\\(/);
+    } finally {
+        global.fetch = previousFetch;
+        for (const [key, value] of Object.entries(previousEnv)) {
+            if (value === undefined) delete process.env[key];
+            else process.env[key] = value;
+        }
+    }
+});
