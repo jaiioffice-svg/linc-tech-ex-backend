@@ -319,6 +319,83 @@ test('consumeInternalAssertion rejects a malformed RPC response', async () => {
     }
 });
 
+test('recordAppTermination calls the atomic Supabase RPC and validates its result', async () => {
+    const db = require('../db');
+    const originalFetch = global.fetch;
+    let requestUrl;
+    let requestOptions;
+    const expected = {
+        found: true,
+        alreadyRecorded: false,
+        deletedAt: 1792831500000,
+        eventId: '7d2c45b6-1f54-4cbb-9f85-41ac69f6a1d2',
+        eventStatus: 'pending',
+        guardianLinked: true
+    };
+
+    global.fetch = async (url, options) => {
+        requestUrl = String(url);
+        requestOptions = options;
+        return new Response(JSON.stringify(expected), {
+            status: 200,
+            headers: { 'content-type': 'application/json' }
+        });
+    };
+
+    try {
+        await withEnv({
+            VERCEL: '1',
+            VERCEL_ENV: 'preview',
+            SUPABASE_URL: 'https://example-project.supabase.co',
+            SUPABASE_SERVICE_ROLE_KEY: 'sb_secret_test_only'
+        }, async () => {
+            assert.deepEqual(await db.recordAppTermination('delete-user'), expected);
+            assert.match(
+                requestUrl,
+                /\/rest\/v1\/rpc\/linc_record_app_termination$/
+            );
+            assert.equal(requestOptions.method, 'POST');
+            assert.deepEqual(JSON.parse(requestOptions.body), {
+                p_user_id: 'delete-user'
+            });
+            assert.ok(requestOptions.signal instanceof AbortSignal);
+        });
+    } finally {
+        global.fetch = originalFetch;
+    }
+});
+
+test('recordAppTermination rejects malformed RPC results without exposing upstream data', async () => {
+    const db = require('../db');
+    const originalFetch = global.fetch;
+
+    global.fetch = async () => new Response(
+        JSON.stringify({ found: true, alreadyRecorded: false, recipient_line_id: 'should-not-leak' }),
+        { status: 200, headers: { 'content-type': 'application/json' } }
+    );
+
+    try {
+        await withEnv({
+            VERCEL: '1',
+            VERCEL_ENV: 'preview',
+            SUPABASE_URL: 'https://example-project.supabase.co',
+            SUPABASE_SERVICE_ROLE_KEY: 'sb_secret_test_only'
+        }, async () => {
+            await assert.rejects(
+                db.recordAppTermination('delete-user'),
+                error => {
+                    assert.equal(error.code, 'DB_UNAVAILABLE');
+                    assert.equal(error.message, 'App termination RPC returned an unexpected response');
+                    assert.equal(error.message.includes('should-not-leak'), false);
+                    return true;
+                }
+            );
+        });
+    } finally {
+        global.fetch = originalFetch;
+    }
+});
+
 test('saveUser persists a profile using a Supabase upsert', async () => {
     const db = require('../db');
     const originalFetch = global.fetch;
