@@ -35,6 +35,37 @@ async function withEnvAsync(values, callback) {
     }
 }
 
+test('Supabase header builder protects credentials while preserving safe PostgREST headers', () => {
+    const { buildSupabaseHeaders } = require('../db');
+
+    const secretHeaders = buildSupabaseHeaders('sb_secret_server_key', {
+        apikey: 'attacker-key',
+        APIKEY: 'another-attacker-key',
+        Authorization: 'Bearer attacker-token',
+        authorization: 'Bearer second-attacker-token',
+        'Content-Type': 'text/plain',
+        'cOnTeNt-TyPe': 'application/x-www-form-urlencoded',
+        Prefer: 'return=representation'
+    });
+
+    assert.equal(secretHeaders.apikey, 'sb_secret_server_key');
+    assert.equal(Object.hasOwn(secretHeaders, 'APIKEY'), false);
+    assert.equal(Object.hasOwn(secretHeaders, 'Authorization'), false);
+    assert.equal(Object.hasOwn(secretHeaders, 'authorization'), false);
+    assert.equal(secretHeaders['Content-Type'], 'application/json');
+    assert.equal(secretHeaders.Prefer, 'return=representation');
+
+    const legacyHeaders = buildSupabaseHeaders('legacy-service-jwt-that-is-not-sb-secret', {
+        authorization: 'Bearer attacker-token',
+        Prefer: 'resolution=merge-duplicates,return=minimal'
+    });
+    assert.equal(
+        legacyHeaders.Authorization,
+        'Bearer legacy-service-jwt-that-is-not-sb-secret'
+    );
+    assert.equal(legacyHeaders.Prefer, 'resolution=merge-duplicates,return=minimal');
+});
+
 test('Supabase config requires both URL and service key', () => {
     withEnv({ SUPABASE_URL: 'https://example.supabase.co', SUPABASE_SERVICE_ROLE_KEY: undefined }, () => {
         assert.equal(hasSupabaseConfig(), false);
