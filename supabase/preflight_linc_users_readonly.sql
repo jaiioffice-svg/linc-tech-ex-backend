@@ -78,6 +78,7 @@ select
 from (
   select count(*) as group_size
   from public.linc_users as u
+  where nullif(btrim(to_jsonb(u)->>'user_id'), '') is not null
   group by to_jsonb(u)->>'user_id'
   having count(*) > 1
 ) duplicate_groups;
