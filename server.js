@@ -37,8 +37,8 @@ function getAllowedOrigins() {
         });
 }
 
-app.use(express.json({ limit: '64kb' }));
-
+// Install CORS and security headers before body parsing so malformed or
+// oversized JSON errors receive the same response hardening as normal routes.
 app.use(cors({
     origin(origin, callback) {
         if (typeof origin !== 'string' || !origin) {
@@ -49,6 +49,7 @@ app.use(cors({
 }));
 
 app.use(helmet());
+app.use(express.json({ limit: '64kb' }));
 
 function sendEmergencySignal(alertPayload) {
     // This records observability only. A delivery worker/provider is not wired yet.
