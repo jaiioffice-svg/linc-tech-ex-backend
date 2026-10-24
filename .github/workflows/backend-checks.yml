@@ -23,5 +23,15 @@ jobs:
         uses: actions/setup-node@v4
       - name: Install locked dependencies
         run: npm ci
+      - name: Audit dependency vulnerabilities
+        run: npm audit --audit-level=high
+      - name: Check JavaScript syntax
+        run: |
+          node --check server.js
+          node --check db.js
+          node --check controllers.js
+          node --check error-handler.js
+          node --check request-validation.js
+          node --check internal-assertion.js
       - name: Run unit tests
         run: npm test
