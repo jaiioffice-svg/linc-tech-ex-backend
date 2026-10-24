@@ -200,3 +200,12 @@ Continue in the existing PR #2 by reviewing and tightening the **testable integr
 ## Release decision
 
 Keep PR #2 in Draft/unmerged state and Issue #22 open. Before release, confirm the approved Client and request/auth contract, implement server-side credential verification with expiry/revocation and principal-derived owner isolation, verify guardian pairing, obtain authorized Preview POST testing, and confirm Preview database isolation before any synthetic CRUD. Passing unit/CI/health checks is not proof that real user authentication or data isolation is complete.
+
+
+
+## Latest Production read-only recheck — 2026-10-24 07:47 UTC (14:47 Thailand time)
+A fresh GET to the Production alias on 2026-10-24 returned HTTP 500 with Vercel error `FUNCTION_INVOCATION_FAILED` for both routes:
+- `GET /health`: request ID `sin1::v2hmx-1792828074998-fc6babdb3211`.
+- `GET /ready`: request ID `sin1::qc57l-1792828076455-75a4bbaac9ff`.
+
+Both were read-only GET requests. This confirms the Production incident persists after the Candidate test/doc work. It does not identify a new root cause, and no Production deployment, environment edit, database operation, secret read, or SSO change was performed.
