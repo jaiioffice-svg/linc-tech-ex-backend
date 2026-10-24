@@ -252,3 +252,17 @@ The protected `/api/v1/` routes now have a route-inventory regression asserting 
 Latest Candidate head at this checkpoint: `7bab0b7fde128febc877923c18a6fb85bd9489c5`. Isolated Sandbox: `npm ci` passed (85 packages), `npm test` passed **50/50**, `npm audit` reported 0 vulnerabilities, JS syntax checks passed for `server.js`, `db.js`, `error-handler.js` and `request-validation.js`, Vercel branch-scope/config and `git diff --check` passed; GitHub Actions [run #181](https://github.com/jaiioffice-svg/linc-tech-ex-backend/actions/runs/40077113249) succeeded.
 
 The separate inspected Client archive still uses opaque bearer sessions in its own server-side JSON persistence and relative `/api/...` routes, while this Candidate exposes different `/api/v1/...` routes and requires a server-only service key plus a trusted `req.auth.userId`. The archive remains unconfirmed as the deployed/approved Client. Do not bridge these contracts by trusting bearer tokens or body IDs without a reviewed verifier. Preview SSO and build quota remain deployment blockers; no Preview user-authenticated POST or live Supabase CRUD is claimed.
+
+
+
+## Latest runtime/test candidate and Production recheck — 2026-10-24 08:16 UTC (15:16 Thailand time)
+
+Candidate `db.js` now verifies successful PostgREST responses have the row-array shape it expects; malformed successful response payloads return a normalized database-unavailable result rather than bubbling a TypeError. New regression coverage is in `test/db.test.js`.
+
+Exact code/test commit `b779f254ae7023131df042eb181804f803cc3769` passed **51/51 tests** in a newly created isolated Sandbox; `npm ci` installed 85 packages, `npm audit` reported 0 vulnerabilities, `node --check server.js`, `db.js`, `error-handler.js`, and `request-validation.js` passed, Vercel config/branch-scope and `git diff --check` passed. GitHub Actions [run #189](https://github.com/jaiioffice-svg/linc-tech-ex-backend/actions/runs/40077335065) succeeded on the same code/test commit.
+
+The latest read-only Production probe at 08:16 UTC returned HTTP 500 `FUNCTION_INVOCATION_FAILED`:
+- `GET /health`: request ID `sin1::g6k7v-1792829800876-34be09cb0831`.
+- `GET /ready`: request ID `sin1::rqp4b-1792829801908-be8b37baa370`.
+
+These are GET-only availability checks. The Candidate remains Draft/unmerged; there was no Production deployment, environment mutation, secret decryption, SQL migration, database CRUD, Preview session bypass or real LINE delivery. The Client archive is still not confirmed as the approved deployed Client, so the bearer-session bridge remains an explicit release gate.
