@@ -49,7 +49,7 @@ app.use(cors({
 }));
 
 app.use(helmet());
-app.use(express.json({ limit: '64kb' }));
+app.use(express.json({ limit: '64kb', strict: false }));
 
 function sendEmergencySignal(alertPayload) {
     // This records observability only. A delivery worker/provider is not wired yet.
