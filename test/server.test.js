@@ -110,7 +110,7 @@ test('protected API reports missing API-key configuration safely', async () => {
 });
 
 test('protected API rejects requests without an API key', async () => {
-    process.env.LINC_API_KEY = 'test-only-key';
+    process.env.LINC_API_KEY = 'test-only-api-key-that-is-definitely-over-32-bytes';
     const response = await fetch(`${baseUrl}/api/v1/heartbeat`, {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
@@ -123,10 +123,10 @@ test('protected API rejects requests without an API key', async () => {
 });
 
 test('heartbeat fails closed without verified identity even when body identifier is blank', async () => {
-    process.env.LINC_API_KEY = 'test-only-key';
+    process.env.LINC_API_KEY = 'test-only-api-key-that-is-definitely-over-32-bytes';
     const response = await fetch(`${baseUrl}/api/v1/heartbeat`, {
         method: 'POST',
-        headers: { 'content-type': 'application/json', 'x-linc-api-key': 'test-only-key' },
+        headers: { 'content-type': 'application/json', 'x-linc-api-key': 'test-only-api-key-that-is-definitely-over-32-bytes' },
         body: JSON.stringify({ userId: '   ' })
     });
     const body = await response.json();
@@ -137,10 +137,10 @@ test('heartbeat fails closed without verified identity even when body identifier
 });
 
 test('heartbeat fails closed without verified identity even when body identifier is oversized', async () => {
-    process.env.LINC_API_KEY = 'test-only-key';
+    process.env.LINC_API_KEY = 'test-only-api-key-that-is-definitely-over-32-bytes';
     const response = await fetch(`${baseUrl}/api/v1/heartbeat`, {
         method: 'POST',
-        headers: { 'content-type': 'application/json', 'x-linc-api-key': 'test-only-key' },
+        headers: { 'content-type': 'application/json', 'x-linc-api-key': 'test-only-api-key-that-is-definitely-over-32-bytes' },
         body: JSON.stringify({ userId: 'u'.repeat(201) })
     });
     const body = await response.json();
@@ -150,10 +150,10 @@ test('heartbeat fails closed without verified identity even when body identifier
 });
 
 test('termination route fails closed without verified identity before database access', async () => {
-    process.env.LINC_API_KEY = 'test-only-key';
+    process.env.LINC_API_KEY = 'test-only-api-key-that-is-definitely-over-32-bytes';
     const response = await fetch(`${baseUrl}/api/v1/alert/delete`, {
         method: 'POST',
-        headers: { 'content-type': 'application/json', 'x-linc-api-key': 'test-only-key' },
+        headers: { 'content-type': 'application/json', 'x-linc-api-key': 'test-only-api-key-that-is-definitely-over-32-bytes' },
         body: JSON.stringify({ userId: 'delete-user' })
     });
     const body = await response.json();
@@ -171,14 +171,14 @@ test('registration fails closed even when caller has the shared API key and subm
         throw new Error('Unexpected external request in fail-closed test');
     };
     try {
-        process.env.LINC_API_KEY = 'test-only-key';
+        process.env.LINC_API_KEY = 'test-only-api-key-that-is-definitely-over-32-bytes';
         process.env.SUPABASE_URL = 'https://example-project.supabase.co';
         process.env.SUPABASE_SERVICE_ROLE_KEY = 'sb_secret_test_only';
         const response = await fetch(`${baseUrl}/api/v1/users/register`, {
             method: 'POST',
             headers: {
                 'content-type': 'application/json',
-                'x-linc-api-key': 'test-only-key'
+                'x-linc-api-key': 'test-only-api-key-that-is-definitely-over-32-bytes'
             },
             body: JSON.stringify({
                 userId: 'claimed-user',
@@ -205,14 +205,14 @@ test('heartbeat fails closed without verified identity and does not write persis
         throw new Error('Unexpected external request in fail-closed test');
     };
     try {
-        process.env.LINC_API_KEY = 'test-only-key';
+        process.env.LINC_API_KEY = 'test-only-api-key-that-is-definitely-over-32-bytes';
         process.env.SUPABASE_URL = 'https://example-project.supabase.co';
         process.env.SUPABASE_SERVICE_ROLE_KEY = 'sb_secret_test_only';
         const response = await fetch(`${baseUrl}/api/v1/heartbeat`, {
             method: 'POST',
             headers: {
                 'content-type': 'application/json',
-                'x-linc-api-key': 'test-only-key'
+                'x-linc-api-key': 'test-only-api-key-that-is-definitely-over-32-bytes'
             },
             body: JSON.stringify({ userId: 'deleted-user', grade: 'M1' })
         });
@@ -227,12 +227,12 @@ test('heartbeat fails closed without verified identity and does not write persis
 });
 
 test('registration cannot spoof req.auth by nesting an auth object in JSON body', async () => {
-    process.env.LINC_API_KEY = 'test-only-key';
+    process.env.LINC_API_KEY = 'test-only-api-key-that-is-definitely-over-32-bytes';
     const response = await fetch(`${baseUrl}/api/v1/users/register`, {
         method: 'POST',
         headers: {
             'content-type': 'application/json',
-            'x-linc-api-key': 'test-only-key'
+            'x-linc-api-key': 'test-only-api-key-that-is-definitely-over-32-bytes'
         },
         body: JSON.stringify({
             userId: 'claimed-user',
