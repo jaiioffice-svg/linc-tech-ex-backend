@@ -35,7 +35,7 @@ async function withEnvAsync(values, callback) {
     }
 }
 
-test('Supabase header builder protects credentials while preserving safe PostgREST headers', () => {
+test('Supabase header builder allows only safe Prefer extension headers', () => {
     const { buildSupabaseHeaders } = require('../db');
 
     const secretHeaders = buildSupabaseHeaders('sb_secret_server_key', {
@@ -45,7 +45,10 @@ test('Supabase header builder protects credentials while preserving safe PostgRE
         authorization: 'Bearer second-attacker-token',
         'Content-Type': 'text/plain',
         'cOnTeNt-TyPe': 'application/x-www-form-urlencoded',
-        Prefer: 'return=representation'
+        Prefer: 'return=representation',
+        'X-Injected-Header': 'attacker-controlled',
+        Host: 'attacker.example',
+        Cookie: 'session=attacker-controlled'
     });
 
     assert.equal(secretHeaders.apikey, 'sb_secret_server_key');
@@ -54,16 +57,26 @@ test('Supabase header builder protects credentials while preserving safe PostgRE
     assert.equal(Object.hasOwn(secretHeaders, 'authorization'), false);
     assert.equal(secretHeaders['Content-Type'], 'application/json');
     assert.equal(secretHeaders.Prefer, 'return=representation');
+    assert.equal(Object.hasOwn(secretHeaders, 'X-Injected-Header'), false);
+    assert.equal(Object.hasOwn(secretHeaders, 'Host'), false);
+    assert.equal(Object.hasOwn(secretHeaders, 'Cookie'), false);
 
     const legacyHeaders = buildSupabaseHeaders('legacy-service-jwt-that-is-not-sb-secret', {
         authorization: 'Bearer attacker-token',
-        Prefer: 'resolution=merge-duplicates,return=minimal'
+        pReFeR: 'resolution=merge-duplicates,return=minimal'
     });
     assert.equal(
         legacyHeaders.Authorization,
         'Bearer legacy-service-jwt-that-is-not-sb-secret'
     );
     assert.equal(legacyHeaders.Prefer, 'resolution=merge-duplicates,return=minimal');
+
+    const invalidExtensionHeaders = buildSupabaseHeaders('sb_secret_server_key', {
+        Prefer: 'return=representation' + String.fromCharCode(10),
+        'X-Injected-Header': 'should-not-pass'
+    });
+    assert.equal(Object.hasOwn(invalidExtensionHeaders, 'Prefer'), false);
+    assert.equal(Object.hasOwn(invalidExtensionHeaders, 'X-Injected-Header'), false);
 });
 
 test('Supabase config requires both URL and service key', () => {
