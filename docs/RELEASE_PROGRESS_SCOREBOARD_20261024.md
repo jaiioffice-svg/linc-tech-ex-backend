@@ -24,7 +24,7 @@ During the outbox-migration work, a GitHub file-creation call omitted its option
 Verified facts:
 - The commit diff contains only the new SQL file supabase/migrations/20261024_005_outbox_fail_closed_default.sql; it does not modify application runtime code.
 - No SQL migration was executed against Supabase and no persistent database or secret value was changed.
-- Vercel marked the deployment READY, but build status is not an HTTP health check. A runtime-log lookup for the new deployment found no request/error logs in the inspected window, so current /health behavior was not verified.
+- Vercel marked the deployment READY, but follow-up read-only GET checks confirmed both `/health` and `/ready` still return HTTP 500. Request-correlated runtime logs for those requests show `EROFS: read-only file system, open '/var/task/linc_data.json'` at `/var/task/db.js:6:8`. The failure is therefore verified on the latest deployment; READY reflects deployment/build state, not route health.
 - The same migration file has since been explicitly saved into the Candidate branch at 608ddf19658319eca5e98238c4bab4ec919149e2, and its tests passed in CI run #491.
 - No further Production deployment, rollback, alias move or configuration change has been issued. Because the instruction is not to alter Production, remediation of the unintended deployment requires a separately authorized Production action; do not claim it was rolled back.
 
