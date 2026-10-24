@@ -78,7 +78,7 @@ Responses must be stable and non-sensitive:
 - 404: the requested user/resource does not exist or should not be disclosed
 - 409: idempotency/conflict case that the caller can resolve
 - 413: request body too large
-- 429: rate limit exceeded
+- 429: reserved for a future distributed rate limiter; no rate-limit middleware is currently wired in this Candidate.
 - 500: unexpected internal error, generic public message only
 - 503: required identity/database/provider configuration missing or dependency unavailable
 
