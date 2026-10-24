@@ -70,6 +70,7 @@ app.post(
 app.post(
     '/api/v1/users/register',
     validateApiKey,
+    authenticateInternalAssertion,
     requireVerifiedEndUser,
     validateUserRequest,
     handleUserRegistration
@@ -78,6 +79,7 @@ app.post(
 app.post(
     '/api/v1/alert/delete',
     validateApiKey,
+    authenticateInternalAssertion,
     requireVerifiedEndUser,
     validateUserRequest,
     (req, res) => handleImmediateDelete(req, res, sendEmergencySignal)
