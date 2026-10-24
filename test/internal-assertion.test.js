@@ -104,7 +104,7 @@ test('missing or too-short internal assertion secret fails closed with 503', asy
 
 test('valid short-lived assertion establishes only the verified principal fields', async () => {
     const req = mockRequest(signAssertion());
-    req.body = { userId: 'attacker-body-id', auth: { userId: 'spoofed-id' } };
+    req.body = { userId: 'verified-user-123', auth: { userId: 'spoofed-id' } };
     const res = mockResponse();
     let nextCalled = false;
 
@@ -126,6 +126,26 @@ test('valid short-lived assertion establishes only the verified principal fields
     assert.equal(Object.isFrozen(req.auth), true);
 });
 
+
+
+test('body user mismatch is rejected before consuming the assertion identifier', async () => {
+    let consumeCalled = false;
+    const result = await run(signAssertion(), {
+        request: { body: { userId: 'attacker-selected-user' } },
+        consumeAssertionId: async () => {
+            consumeCalled = true;
+            return true;
+        }
+    });
+
+    assert.equal(result.res.statusCode, 403);
+    assert.equal(
+        result.res.body.message,
+        'Requested user does not match authenticated identity'
+    );
+    assert.equal(result.nextCalled, false);
+    assert.equal(consumeCalled, false);
+});
 
 test('a short-lived assertion can be consumed only once', async () => {
     const token = signAssertion();
