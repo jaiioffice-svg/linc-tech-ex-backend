@@ -181,3 +181,13 @@ The verifier requires a secret of at least 32 bytes and assertions with expiry n
 The assertion ID (`jti`) is syntactically validated but is **not yet consumed from a replay store**. Treat it as a fresh per-request ID, keep TTL at 30 seconds in the BFF, call the Backend only from the server-side BFF over HTTPS, never log or return the assertion, and retain idempotent server handlers. One-time replay protection remains a release-hardening item. Details and a complete signer example are in [docs/BFF_ASSERTION_CONTRACT.md](https://github.com/jaiioffice-svg/linc-tech-ex-backend/blob/fix/linc-backend-clean-pr/docs/BFF_ASSERTION_CONTRACT.md).
 
 The app-delete controller is now idempotent for the terminal `app_deleted` state: repeated requests do not rewrite the deletion timestamp or re-emit the pending alert event. This prevents a short-lived assertion replay from duplicating the same terminal alert transition. Real LINE delivery and a durable notification outbox remain unimplemented.
+
+
+
+## 16. End-to-end signed assertion gate verification — 2026-10-24
+
+The route inventory now proves that all three protected routes have the full authentication/validation chain in order: service key → signed internal assertion → verified principal/body consistency → request validation. The Express-level integration test verifies that missing assertion returns 401, an assertion scoped to a different route returns 401, a body-supplied different user ID returns 403, and a valid assertion with no Supabase configuration is rejected as 503 before any live DB call.
+
+The verifier rejects unknown JWT header parameters and impossible `nbf`/expiry combinations in addition to validating HS256, issuer, audience, `sub`, `iat`, `exp`, `jti` format, and exact allowed route scope. The current `jti` is not stored/consumed as a one-time nonce; replay prevention remains a release-hardening item. The app-delete controller now suppresses duplicate terminal transitions for an already `app_deleted` profile.
+
+Candidate code/test commit `8e846ca9b7182cf3140e493b43925ad4286a1f4b` passed **61/61 tests** in an isolated Node 22 Sandbox, `npm ci` installed 85 packages, `npm audit` reported zero vulnerabilities, syntax checks passed for the backend runtime/middleware files, Vercel branch-scope/config and `git diff --check` passed, and GitHub Actions [run #225](https://github.com/jaiioffice-svg/linc-tech-ex-backend/actions/runs/40078015703) succeeded. The BFF itself remains unwired; a signed assertion does not replace validating the user's session at the BFF.
