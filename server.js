@@ -51,10 +51,13 @@ app.use(cors({
 app.use(helmet());
 
 function sendEmergencySignal(alertPayload) {
-    console.warn('[ALERT_PENDING]', JSON.stringify({
-        userId: alertPayload.userId,
+    // This records observability only. A delivery worker/provider is not wired yet.
+    // The durable outbox entry has already been committed before this callback runs.
+    console.info('[ALERT_OUTBOX_RECORDED]', JSON.stringify({
+        eventId: alertPayload.eventId,
         reason: alertPayload.reason,
-        guardianLinked: Boolean(alertPayload.guardianLineId)
+        eventStatus: alertPayload.eventStatus,
+        guardianLinked: Boolean(alertPayload.guardianLinked)
     }));
 }
 
