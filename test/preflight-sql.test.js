@@ -14,6 +14,12 @@ test('Supabase preflight explicitly tells operators to stop if the table is abse
     assert.match(sql, /sections 2-9 require the table to exist/i);
 });
 
+test('Supabase preflight warns operators not to execute all sections on an unknown schema', () => {
+    assert.match(sql, /DO NOT execute this whole file at once/i);
+    assert.match(sql, /select and execute ONLY the query in section 1/i);
+    assert.match(sql, /If section 1 returns zero rows, STOP/i);
+});
+
 test('Supabase preflight is read-only and contains no data/schema mutation statements', () => {
     assert.doesNotMatch(
         executableSql,
