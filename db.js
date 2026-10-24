@@ -10,7 +10,8 @@ function hasSupabaseConfig() {
 }
 
 function isDatabaseConfigured() {
-    return hasSupabaseConfig() || !(process.env.VERCEL || process.env.VERCEL_ENV);
+    if (hasSupabaseConfig()) return isSupabaseUrlAllowed();
+    return !(process.env.VERCEL || process.env.VERCEL_ENV);
 }
 
 function assertDatabaseAvailable() {
@@ -43,13 +44,68 @@ function writeLocalState(state) {
 }
 
 function supabaseBaseUrl() {
-    // Accept either the Supabase Project URL or a URL copied with /rest/v1.
-    // The REST path is appended by supabaseRequest, so retaining it here would
-    // create /rest/v1/rest/v1/... and PostgREST responds with PGRST125.
-    return process.env.SUPABASE_URL
-        .trim()
-        .replace(/\/+$/, '')
-        .replace(/\/rest\/v1$/i, '');
+    const rawUrl = process.env.SUPABASE_URL;
+
+    if (typeof rawUrl !== 'string' || !rawUrl.trim()) {
+        const error = new Error('Supabase URL is not configured');
+        error.code = 'DB_NOT_CONFIGURED';
+        throw error;
+    }
+
+    let parsed;
+    try {
+        parsed = new URL(rawUrl.trim());
+    } catch (_) {
+        const error = new Error('Supabase URL is invalid');
+        error.code = 'DB_NOT_CONFIGURED';
+        throw error;
+    }
+
+    // Never send the service-role key to URLs containing userinfo, query/hash
+    // data, or paths outside the documented Project URL and optional /rest/v1.
+    const pathname = parsed.pathname.replace(/\/+$/, '');
+    if (
+        parsed.username ||
+        parsed.password ||
+        parsed.search ||
+        parsed.hash ||
+        !['', '/rest/v1'].includes(pathname)
+    ) {
+        const error = new Error('Supabase URL is invalid');
+        error.code = 'DB_NOT_CONFIGURED';
+        throw error;
+    }
+
+    const runningOnVercel = Boolean(process.env.VERCEL || process.env.VERCEL_ENV);
+    const hostname = parsed.hostname.toLowerCase();
+    const standardSupabaseHost =
+        hostname.endsWith('.supabase.co') &&
+        hostname.length > '.supabase.co'.length;
+    const loopbackHost = ['localhost', '127.0.0.1', '::1'].includes(hostname);
+    const allowedHttpsHost = parsed.protocol === 'https:' &&
+        (!runningOnVercel || standardSupabaseHost);
+    const allowedLocalHttp = !runningOnVercel &&
+        parsed.protocol === 'http:' &&
+        loopbackHost;
+
+    if (!allowedHttpsHost && !allowedLocalHttp) {
+        const error = new Error('Supabase URL is not an allowed API endpoint');
+        error.code = 'DB_NOT_CONFIGURED';
+        throw error;
+    }
+
+    // Accept either the Supabase Project URL or its /rest/v1 base path.
+    // supabaseRequest appends /rest/v1, so always return the origin only.
+    return parsed.origin;
+}
+
+function isSupabaseUrlAllowed() {
+    try {
+        supabaseBaseUrl();
+        return true;
+    } catch (_) {
+        return false;
+    }
 }
 
 const DATABASE_REQUEST_TIMEOUT_MS = 8000;
