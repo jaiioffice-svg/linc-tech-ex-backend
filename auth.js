@@ -4,7 +4,7 @@ function validateApiKey(req, res, next) {
     const configuredKey = process.env.LINC_API_KEY;
     const incomingKey = req.get('x-linc-api-key');
 
-    if (!configuredKey) {
+    if (typeof configuredKey !== 'string' || Buffer.byteLength(configuredKey, 'utf8') < 32) {
         return res.status(503).json({ success: false, message: 'API authentication is not configured' });
     }
 
