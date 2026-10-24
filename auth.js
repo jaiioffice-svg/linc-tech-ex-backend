@@ -45,7 +45,9 @@ function requireVerifiedEndUser(req, res, next) {
         });
     }
 
-    const requestedUserId = req.body && req.body.userId;
+    const requestedUserId = req.body && typeof req.body === 'object' && !Array.isArray(req.body)
+        ? req.body.userId
+        : undefined;
     if (requestedUserId !== undefined && requestedUserId !== authenticatedUserId) {
         return res.status(403).json({
             success: false,
