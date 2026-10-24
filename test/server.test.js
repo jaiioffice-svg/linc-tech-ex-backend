@@ -71,7 +71,7 @@ test('protected API rejects requests without an API key', async () => {
     delete process.env.LINC_API_KEY;
 });
 
-test('heartbeat rejects an empty user identifier before database access', async () => {
+test('heartbeat fails closed without verified identity even when body identifier is blank', async () => {
     process.env.LINC_API_KEY = 'test-only-key';
     const response = await fetch(`${baseUrl}/api/v1/heartbeat`, {
         method: 'POST',
@@ -79,13 +79,13 @@ test('heartbeat rejects an empty user identifier before database access', async 
         body: JSON.stringify({ userId: '   ' })
     });
     const body = await response.json();
-    assert.equal(response.status, 400);
+    assert.equal(response.status, 503);
     assert.equal(body.success, false);
-    assert.equal(body.message, 'Missing core identifier');
+    assert.equal(body.message, 'End-user identity verification is not configured');
     delete process.env.LINC_API_KEY;
 });
 
-test('heartbeat rejects an oversized user identifier before database access', async () => {
+test('heartbeat fails closed without verified identity even when body identifier is oversized', async () => {
     process.env.LINC_API_KEY = 'test-only-key';
     const response = await fetch(`${baseUrl}/api/v1/heartbeat`, {
         method: 'POST',
@@ -93,45 +93,31 @@ test('heartbeat rejects an oversized user identifier before database access', as
         body: JSON.stringify({ userId: 'u'.repeat(201) })
     });
     const body = await response.json();
-    assert.equal(response.status, 400);
-    assert.equal(body.success, false);
-    assert.equal(body.message, 'Invalid user identifier');
+    assert.equal(response.status, 503);
+    assert.equal(body.message, 'End-user identity verification is not configured');
     delete process.env.LINC_API_KEY;
 });
 
-test('termination signal rejects an oversized user identifier before database access', async () => {
+test('termination route fails closed without verified identity before database access', async () => {
     process.env.LINC_API_KEY = 'test-only-key';
     const response = await fetch(`${baseUrl}/api/v1/alert/delete`, {
         method: 'POST',
         headers: { 'content-type': 'application/json', 'x-linc-api-key': 'test-only-key' },
-        body: JSON.stringify({ userId: 'u'.repeat(201) })
+        body: JSON.stringify({ userId: 'delete-user' })
     });
     const body = await response.json();
-    assert.equal(response.status, 400);
-    assert.equal(body.success, false);
-    assert.equal(body.message, 'Invalid user identifier');
+    assert.equal(response.status, 503);
+    assert.equal(body.message, 'End-user identity verification is not configured');
     delete process.env.LINC_API_KEY;
 });
 
-
-test('registration cannot set guardian identity from an untrusted request body', async () => {
+test('registration fails closed even when caller has the shared API key and submits a user ID', async () => {
     const originalFetch = global.fetch;
-    let savedRow;
+    let externalFetchCalls = 0;
     global.fetch = async (url, options = {}) => {
         if (String(url).startsWith('http://127.0.0.1:')) return originalFetch(url, options);
-        if (options.method === 'POST') {
-            savedRow = JSON.parse(options.body);
-            return new Response(null, { status: 204 });
-        }
-        return new Response(JSON.stringify([{
-            user_id: 'existing-user',
-            grade: 'M1',
-            guardian_line_id: null,
-            created_at: 123,
-            last_heartbeat: null,
-            status: 'active',
-            data: { userId: 'existing-user', guardianLineId: null, status: 'active' }
-        }]), { status: 200, headers: { 'content-type': 'application/json' } });
+        externalFetchCalls += 1;
+        throw new Error('Unexpected external request in fail-closed test');
     };
     try {
         process.env.LINC_API_KEY = 'test-only-key';
@@ -144,38 +130,28 @@ test('registration cannot set guardian identity from an untrusted request body',
                 'x-linc-api-key': 'test-only-key'
             },
             body: JSON.stringify({
-                userId: 'existing-user',
+                userId: 'claimed-user',
                 grade: 'M1',
                 guardianLineId: 'attacker-controlled-line-id'
             })
         });
-        assert.equal(response.status, 200);
-        assert.equal(savedRow.guardian_line_id, null);
-        assert.equal(savedRow.data.guardianLineId, null);
+        const body = await response.json();
+        assert.equal(response.status, 503);
+        assert.equal(body.message, 'End-user identity verification is not configured');
+        assert.equal(externalFetchCalls, 0);
     } finally {
         global.fetch = originalFetch;
         for (const key of ['LINC_API_KEY', 'SUPABASE_URL', 'SUPABASE_SERVICE_ROLE_KEY']) delete process.env[key];
     }
 });
 
-test('heartbeat does not reactivate a profile marked app_deleted', async () => {
+test('heartbeat fails closed without verified identity and does not write persisted state', async () => {
     const originalFetch = global.fetch;
-    let savedRow;
+    let externalFetchCalls = 0;
     global.fetch = async (url, options = {}) => {
         if (String(url).startsWith('http://127.0.0.1:')) return originalFetch(url, options);
-        if (options.method === 'POST') {
-            savedRow = JSON.parse(options.body);
-            return new Response(null, { status: 204 });
-        }
-        return new Response(JSON.stringify([{
-            user_id: 'deleted-user',
-            grade: 'M1',
-            guardian_line_id: null,
-            created_at: 123,
-            last_heartbeat: null,
-            status: 'app_deleted',
-            data: { userId: 'deleted-user', guardianLineId: null, status: 'app_deleted' }
-        }]), { status: 200, headers: { 'content-type': 'application/json' } });
+        externalFetchCalls += 1;
+        throw new Error('Unexpected external request in fail-closed test');
     };
     try {
         process.env.LINC_API_KEY = 'test-only-key';
@@ -189,9 +165,10 @@ test('heartbeat does not reactivate a profile marked app_deleted', async () => {
             },
             body: JSON.stringify({ userId: 'deleted-user', grade: 'M1' })
         });
-        assert.equal(response.status, 200);
-        assert.equal(savedRow.status, 'app_deleted');
-        assert.equal(savedRow.data.status, 'app_deleted');
+        const body = await response.json();
+        assert.equal(response.status, 503);
+        assert.equal(body.message, 'End-user identity verification is not configured');
+        assert.equal(externalFetchCalls, 0);
     } finally {
         global.fetch = originalFetch;
         for (const key of ['LINC_API_KEY', 'SUPABASE_URL', 'SUPABASE_SERVICE_ROLE_KEY']) delete process.env[key];
