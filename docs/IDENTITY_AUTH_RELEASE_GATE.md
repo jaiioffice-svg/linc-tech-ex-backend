@@ -111,7 +111,7 @@ The documentation-only review update is on [PR #19](https://github.com/jaiioffic
 ### Client identity and release decision
 - The connected GitHub integration exposes only `jaiioffice-svg/linc-tech-ex-backend`; Vercel team `linc8` lists only that backend project. The Library archive `Linc_Updated_Source_for_Online_Testing.zip` dated 2026-10-21 remains an unconfirmed client snapshot, not proof of the approved/deployed Client.
 - The shared `LINC_API_KEY` is service-to-service authentication, not end-user identity, and must not be embedded in a web/mobile client. The approved client/session contract and whether requests pass through a trusted server-side/BFF layer remain unconfirmed.
-- No live registration/read-back, Supabase CRUD, migrations, LINE delivery, Production requests/settings, secret inspection, merge, or Production promotion were performed. Preview database isolation from Production remains unconfirmed.
+- No live registration/read-back, Supabase CRUD, migrations, LINE delivery, Production writes/configuration changes, secret inspection, merge, or Production promotion were performed. Only read-only GET requests to Production `/health` and `/ready` were sent for availability diagnostics. Preview database isolation from Production remains unconfirmed.
 
 ## Production startup incident — rechecked 2026-10-24 06:24 UTC
 
