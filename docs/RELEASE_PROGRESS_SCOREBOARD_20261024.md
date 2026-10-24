@@ -1,6 +1,6 @@
 # L!nc Backend — release progress scoreboard
 
-**As of: 2026-10-24 18:23 Asia/Bangkok**  
+**As of: 2026-10-24 18:26 Asia/Bangkok**  
 **Scope:** first safely usable end-to-end Backend MVP, not the complete product UI. The approved/deployed Client source is not currently confirmed, so this is a conservative engineering estimate, not a claim that the whole L!nc app is this complete.
 
 ## Executive status
@@ -66,6 +66,7 @@ Therefore, **the ~30% figure applies only to the first safe Backend MVP**, not t
 2. Assertion replay protection and the durable termination outbox have embedded PostgreSQL-compatible regression tests.
 3. The outbox now **blocks** events and stores no recipient when the only evidence is a legacy `guardian_line_id`; the app adapter also rejects unsafe RPC responses.
 4. Latest CI HEAD `95db390` passed GitHub Actions run #349 with 90 tests and zero failures, `npm audit --audit-level=high` reporting 0 vulnerabilities, and six-file JavaScript syntax checks. The assertion verifier now rejects unknown payload claims before replay-store access.
+5. Added [`docs/API_CONTRACT.md`](./API_CONTRACT.md) as a single Candidate API reference for liveness/readiness, authenticated route contracts, status codes, payload limits, CORS and the fact that app-termination status `blocked` records an event but does not send a LINE message. This is documentation work; it does not close live integration gates.
 5. Release-gate, outbox fail-closed, and guardian-pairing contracts are saved in this branch.
 
 ## Remaining gates in dependency order
