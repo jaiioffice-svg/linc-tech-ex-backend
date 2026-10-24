@@ -72,6 +72,13 @@ These tests prove behavior of the interim guard and controller logic; they do no
 - Added `test/vercel-config.test.js`: protects the Vercel branch-pause setting and confirms the existing Express build/routes remain configured.
 - Added `test/cors.test.js`: verifies exact-origin allowlisting, rejects unlisted/invalid origins, confirms no browser CORS grant when not configured, and checks that server-to-server health requests still work.
 
+### Candidate local HTTP smoke — read-only / fail-closed checks
+- On exact checked-out candidate HEAD `b516a6a13c3ac8ddc846a8033e3234e02d3cc763` in an isolated Vercel Sandbox, I started `server.js` with `VERCEL=1`, explicitly removed both Supabase environment variables for this test, and used a throwaway test API key value (not a Vercel secret).
+- `GET /health`: **HTTP 200**, `{"status":"operational"}`.
+- `GET /ready`: **HTTP 503**, `{"status":"not_ready","reason":"database_not_configured"}` — expected because the test deliberately omitted Supabase configuration.
+- `POST /api/v1/heartbeat` with the throwaway service key and a request-body `userId`, but without any verified server-side principal: **HTTP 503**, `End-user identity verification is not configured`. No profile write occurred.
+- Verified no `linc_data.json` was created and the Git worktree remained clean. This checks application startup and intended fail-closed behavior only; it does **not** prove live Supabase connectivity, user authentication integration, Preview deployment behavior, or Production health.
+
 ### CORS allowlist hardening — latest Runtime change
 - `server.js` now reads `LINC_ALLOWED_ORIGINS` as a comma-separated list of exact `scheme://host[:port]` origins. Requests with an `Origin` header receive CORS permission only for an exact, valid allowlist match; wildcard origins, URL paths, and non-HTTP(S) values are not accepted.
 - If `LINC_ALLOWED_ORIGINS` is absent or empty, browser origins receive no CORS grant. Requests without an `Origin` header (such as server-to-server calls) continue to work. CORS is not authentication; the end-user identity gate remains required.
