@@ -18,8 +18,10 @@ async function applyMigrations(database, options = {}) {
         '20261023_004_repair_service_role_grants.sql',
         '20261024_003_auth_assertion_replay.sql',
         '20261024_004_notification_outbox.sql',
-        '20261024_005_outbox_fail_closed_default.sql',
-        ...(options.includeDispatchDisable === false ? [] : ['20261024_006_disable_unverified_outbox_dispatch.sql'])
+        ...(options.includeOutboxUpgrades === false ? [] : [
+            '20261024_005_outbox_fail_closed_default.sql',
+            '20261024_006_disable_unverified_outbox_dispatch.sql'
+        ])
     ]) {
         const fullPath = path.join(__dirname, '..', 'supabase', 'migrations', filename);
         await database.exec(fs.readFileSync(fullPath, 'utf8'));
@@ -220,7 +222,7 @@ test('dispatch-disable migration blocks every undelivered legacy event and clear
     const database = new PGlite();
 
     try {
-        await applyMigrations(database, { includeDispatchDisable: false });
+        await applyMigrations(database, { includeOutboxUpgrades: false });
         await seedUser(database, 'legacy-outbox-user', 'legacy-line-id');
 
         // Recreate a pre-guard table with the previous permissive status/recipient check.
@@ -246,13 +248,19 @@ test('dispatch-disable migration blocks every undelivered legacy event and clear
             );
         }
 
-        const migration = fs.readFileSync(
+        const safeDefaultMigration = fs.readFileSync(
+            path.join(__dirname, '..', 'supabase', 'migrations', '20261024_005_outbox_fail_closed_default.sql'),
+            'utf8'
+        );
+        const disableDispatchMigration = fs.readFileSync(
             path.join(__dirname, '..', 'supabase', 'migrations', '20261024_006_disable_unverified_outbox_dispatch.sql'),
             'utf8'
         );
-        await database.exec(migration);
-        // Re-running is safe and proves the migration is idempotent.
-        await database.exec(migration);
+        await database.exec(safeDefaultMigration);
+        await database.exec(disableDispatchMigration);
+        // Re-running both migrations is safe and proves they are idempotent.
+        await database.exec(safeDefaultMigration);
+        await database.exec(disableDispatchMigration);
 
         const rows = await database.query(
             'SELECT event_status, recipient_line_id FROM public.linc_notification_outbox WHERE user_id = $1 ORDER BY event_status, event_id',
