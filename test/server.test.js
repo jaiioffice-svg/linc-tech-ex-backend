@@ -101,7 +101,7 @@ test('heartbeat rejects an oversized user identifier before database access', as
 
 test('termination signal rejects an oversized user identifier before database access', async () => {
     process.env.LINC_API_KEY = 'test-only-key';
-    const response = await fetch(`${baseUrl}/api/alert/delete`, {
+    const response = await fetch(`${baseUrl}/api/v1/alert/delete`, {
         method: 'POST',
         headers: { 'content-type': 'application/json', 'x-linc-api-key': 'test-only-key' },
         body: JSON.stringify({ userId: 'u'.repeat(201) })
