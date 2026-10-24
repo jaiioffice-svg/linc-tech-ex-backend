@@ -215,3 +215,17 @@ Fresh read-only HTTP GET probes at 2026-10-24 09:04 UTC returned HTTP 500 `FUNCT
 Vercel reports the active Production deployment as `dpl_2ELeGpWoXTL6wFFvLEXxrLZzRgAk`, from `main` SHA `336e2fcdd1b9f0841432817dcafe955b45700eef` (“Restore Vercel Node API routing configuration”). Runtime-log queries did not provide the individual request stack traces; a two-hour query was rejected because it exceeded the Hobby runtime-log retention window. The grouped Runtime Errors query also returned no clusters for the selected time range, which does not negate the observed HTTP 500 responses.
 
 The source-level hypothesis remains that the Production `main` version attempts to write `linc_data.json` during module initialization before Express handles requests, conflicting with the read-only serverless filesystem. Controlled fault injection previously reproduced the `EROFS` propagation on the exact `main` source chain; this is not a live Production stack trace. The Candidate remains Draft/unmerged and branch auto-deployment remains paused. The replay migration has not been executed against any database; no Production code/configuration, secrets, database, or LINE delivery was changed.
+
+## 19. PostgreSQL migration integration test — 2026-10-24
+
+Added `@electric-sql/pglite` as a development-only dependency and `test/replay-migration-postgres.test.js` so CI now executes the actual replay migration inside an embedded PostgreSQL engine instead of relying only on regex/static SQL checks. The test creates isolated `anon`, `authenticated` and `service_role` roles, executes `20261024_003_auth_assertion_replay.sql`, and verifies:
+- first use of a JTI returns `true`, second use returns `false`;
+- expired assertions are rejected with SQLSTATE `22023`;
+- expired replay rows are pruned on a subsequent valid consume;
+- the `anon` role cannot select the replay table or execute the consume function;
+- `service_role` can execute the RPC; and
+- row-level security is enabled on the replay table.
+
+Exact code/test commit `e117545e7333d96f91f1881165290f37b7aa7c27` passed **72/72 tests** in an isolated Vercel Sandbox after a clean `npm ci` (86 packages); `npm audit` reported 0 vulnerabilities; syntax, Vercel branch-scope/config and `git diff --check` passed. GitHub Actions [run #281](https://github.com/jaiioffice-svg/linc-tech-ex-backend/actions/runs/40081403065) succeeded.
+
+This materially improves SQL validation, but PGlite is an in-memory PostgreSQL-compatible engine. It does not test actual Supabase PostgREST routing, production roles/extensions/configuration, network credentials, or deployed RLS policy interactions. The migration is **not applied to Supabase or any persistent database**. Confirm the intended non-production Supabase project and test there before treating the database gate as closed.
