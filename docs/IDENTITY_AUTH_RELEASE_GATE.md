@@ -59,27 +59,35 @@ These tests prove behavior of the interim guard and controller logic; they do no
 ## Latest verified evidence — 2026-10-24
 
 ### Latest code/test verification
-- Latest fully tested branch head before this release-gate documentation refresh: [`d594daa359ff6c9da6ab159253434ac8bcc878d8`](https://github.com/jaiioffice-svg/linc-tech-ex-backend/commit/d594daa359ff6c9da6ab159253434ac8bcc878d8). Changes since runtime/test candidate `eedaa6c67c4911c44c6a13bed860020cd27a724a` affect tests, Vercel Git deployment behavior, and documentation only; no application Runtime JavaScript changed.
-- In the isolated Vercel Sandbox on exact commit `d594daa359ff6c9da6ab159253434ac8bcc878d8` (Node v24.22.1, npm 11.19.1):
+- Latest verified runtime/test commit: [`70c9366eab11485b09220ec5d5d4fb18117d3a88`](https://github.com/jaiioffice-svg/linc-tech-ex-backend/commit/70c9366eab11485b09220ec5d5d4fb18117d3a88). It adds an exact-origin CORS allowlist in `server.js` and its regression test; earlier branch changes cover route/config tests and Vercel Git deployment settings.
+- In the isolated Vercel Sandbox on exact commit `70c9366eab11485b09220ec5d5d4fb18117d3a88` (Node v24.22.1, npm 11.19.1):
   - `npm ci --no-audit --no-fund`: PASS; 85 packages installed.
-  - `npm test`: PASS; **36/36 tests**, 0 failed.
+  - `npm test`: PASS; **37/37 tests**, 0 failed.
   - `npm audit`: PASS; **0 vulnerabilities across the full dependency tree**.
   - Vercel config JSON/scope validation and `git diff --check`: PASS; working tree clean.
-- GitHub Actions [Backend checks run #101](https://github.com/jaiioffice-svg/linc-tech-ex-backend/actions/runs/40068639267) succeeded for exact commit `d594daa`; run [#99](https://github.com/jaiioffice-svg/linc-tech-ex-backend/actions/runs/40068519568) also succeeded for the previous docs head.
+- GitHub Actions [Backend checks run #107](https://github.com/jaiioffice-svg/linc-tech-ex-backend/actions/runs/40068792869) succeeded for exact runtime/test commit `70c9366`.
 - Added `test/api-route-security.test.js`: requires every direct Express route under `/api/v1/` to run `validateApiKey` then `requireVerifiedEndUser`, and fails closed if an uninspected nested router is mounted.
 - Added `test/vercel-config.test.js`: protects the Vercel branch-pause setting and confirms the existing Express build/routes remain configured.
+- Added `test/cors.test.js`: verifies exact-origin allowlisting, rejects unlisted/invalid origins, confirms no browser CORS grant when not configured, and checks that server-to-server health requests still work.
+
+### CORS allowlist hardening — latest Runtime change
+- `server.js` now reads `LINC_ALLOWED_ORIGINS` as a comma-separated list of exact `scheme://host[:port]` origins. Requests with an `Origin` header receive CORS permission only for an exact, valid allowlist match; wildcard origins, URL paths, and non-HTTP(S) values are not accepted.
+- If `LINC_ALLOWED_ORIGINS` is absent or empty, browser origins receive no CORS grant. Requests without an `Origin` header (such as server-to-server calls) continue to work. CORS is not authentication; the end-user identity gate remains required.
+- The read-only Vercel environment inventory did not show `LINC_ALLOWED_ORIGINS` configured for Preview. No origin was guessed or inserted. A browser-based Client will require its approved exact origin to be configured before cross-origin requests can work; this remains pending confirmation of the actual Client domain.
+- Local Sandbox verification on the Runtime change passed **37/37 tests**, including CORS preflight coverage, and `npm audit` reported 0 vulnerabilities. GitHub Actions run #107 passed for exact Runtime/test commit `70c9366`.
 
 ### Vercel deployment quota mitigation
 - `vercel.json` now sets `git.deploymentEnabled["fix/linc-backend-clean-pr"] = false`. This prevents commits to the guarded review branch from automatically triggering new Vercel deployments while work remains test/docs-focused and the team build quota is constrained. See [Vercel Git Configuration](https://vercel.com/docs/project-configuration/git-configuration).
 - This setting is branch-specific; `main` is not set to disabled, and Vercel's documented default for unspecified branches remains enabled. The unit test guards this boundary.
 - This change does **not** disable GitHub Actions. The backend test workflow still runs on branch commits. A future Preview deployment can be created deliberately when a reviewed Runtime change is ready and deployment quota/access allow it; this auto-deploy pause itself is not proof of a new Preview deployment.
-- The latest available code-equivalent guarded Preview remains READY at [deployment `dpl_BeksrwyriYpMTYTg7V2SBSTKL9QR`](https://vercel.com/linc8/linc-tech-ex-backend/BeksrwyriYpMTYTg7V2SBSTKL9QR), runtime SHA `2f2b5fd543f3ea0e5936b5883dac0b1edae1aba9`, URL [`linc-tech-ex-backend-6ie0reaqe-linc8.vercel.app`](https://linc-tech-ex-backend-6ie0reaqe-linc8.vercel.app). Its Runtime code differs from tested candidate `eedaa6c` only in documentation.
+- The latest available guarded Preview remains READY at [deployment `dpl_BeksrwyriYpMTYTg7V2SBSTKL9QR`](https://vercel.com/linc8/linc-tech-ex-backend/BeksrwyriYpMTYTg7V2SBSTKL9QR), runtime SHA `2f2b5fd543f3ea0e5936b5883dac0b1edae1aba9`, URL [`linc-tech-ex-backend-6ie0reaqe-linc8.vercel.app`](https://linc-tech-ex-backend-6ie0reaqe-linc8.vercel.app). It contains the fail-closed identity guard, but predates the latest CORS allowlist Runtime change and is **not** evidence that the new CORS behavior is deployed or tested on Preview.
 - Authorized GET health/readiness checks previously returned HTTP 200 for `/health`, `/api/health`, `/ready`, and `/api/ready`. This proves liveness and that the configured database probe responds only; it does not prove Preview/Production DB isolation or user-level CRUD.
 - Direct POST attempts to register, heartbeat, and alert/delete were intercepted by Vercel Authentication (HTTP 401) before reaching the app. No application-level Preview POST result is claimed.
 
 ### Vercel environment metadata inventory — values not decrypted
 - A read-only Vercel environment listing was performed with decryption disabled; no environment values were displayed or changed.
 - The listing showed `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, and `LINC_API_KEY` targeted to **Preview**. This result did not show those keys targeted to Production. Treat Production database configuration as **not verified** from the current inventory rather than assuming it is configured.
+- `LINC_ALLOWED_ORIGINS` was not present in the inventory. Until the approved web-client origin is confirmed and configured for Preview, browser CORS requests will remain denied by the new allowlist.
 - A generic Preview `CRON_SECRET` and another branch-specific Preview `CRON_SECRET` were listed; the branch-specific entry targets `fix/vercel-readonly-filesystem`, not this guarded review branch. The cron handler remains a placeholder and is not configured in the current `vercel.json` routes.
 - No secret values were requested, decrypted, printed, or edited. This metadata inventory does not prove which Supabase project the Preview URL points to, and it does not prove database separation from Production. Do not run live CRUD until the intended Preview project is independently confirmed.
 
