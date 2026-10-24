@@ -75,7 +75,8 @@ function authenticateInternalAssertion(req, res, next) {
             typeof header !== 'object' ||
             Array.isArray(header) ||
             header.alg !== 'HS256' ||
-            header.typ !== 'JWT'
+            header.typ !== 'JWT' ||
+            Object.keys(header).some(key => key !== 'alg' && key !== 'typ')
         ) {
             return rejectAssertion(res);
         }
@@ -130,7 +131,7 @@ function authenticateInternalAssertion(req, res, next) {
 
         if (
             claims.nbf !== undefined &&
-            (!Number.isSafeInteger(claims.nbf) || claims.nbf > now + 5)
+            (!Number.isSafeInteger(claims.nbf) || claims.nbf > now + 5 || claims.nbf >= claims.exp)
         ) {
             return rejectAssertion(res);
         }
