@@ -140,6 +140,12 @@ No Production code, alias, environment variable, secret, database row, migration
 - These responses establish only that Vercel deployment protection is active; they are **not** application health/readiness results. No HTTP 200/503 application outcome is claimed from this recheck.
 - I did not create a shareable/bypass URL, change SSO protection, or send POST requests. Use an authorized Vercel CLI/MCP path or an explicitly authorized test window to perform the next Preview app-level checks without broadening access to the deployment.
 
+## Production recheck — 2026-10-24 07:26 UTC (14:26 Thailand time)
+- Read-only `GET /health`: **HTTP 500**, `FUNCTION_INVOCATION_FAILED`, Vercel request ID `sin1::brzhx-1792826817503-21d2ea31b401`.
+- Read-only `GET /ready`: **HTTP 500**, `FUNCTION_INVOCATION_FAILED`, Vercel request ID `sin1::w5m9q-1792826818050-42698c9a8c56`.
+- A Vercel Runtime Logs query scoped to the active Production deployment and the previous 30 minutes returned “No logs found for the specified criteria.” This does not prove that no error occurred; a module-initialization failure may happen before normal application logging.
+- The Sandbox did not have the Vercel CLI installed or a local `.vercel/project.json` link, so `vercel curl` was not available through that isolated shell. No Deployment Protection setting or access link was changed.
+
 ## Recommended next path — one candidate, staged verification
 
 Decision as of 2026-10-24: continue with Draft PR #2 (`fix/linc-backend-clean-pr`) as the single Backend release candidate; do not start another overlapping Runtime branch. PR #3 documents the earlier serverless-persistence change, but its route contract does not include the fail-closed verified-end-user gate now present in PR #2.
