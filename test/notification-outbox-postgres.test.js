@@ -138,6 +138,28 @@ test('outbox reports a missing profile without mutating user or outbox data', as
     }
 });
 
+
+test('termination RPC rejects blank, padded, and oversized user IDs', async () => {
+    const database = new PGlite();
+
+    try {
+        await applyMigrations(database);
+        for (const userId of ['', '   ', ' padded-user ', 'u'.repeat(201)]) {
+            await assert.rejects(
+                record(database, userId),
+                error => error && error.code === '22023'
+            );
+        }
+
+        const count = await database.query(
+            'SELECT count(*)::int AS count FROM public.linc_notification_outbox'
+        );
+        assert.equal(count.rows[0].count, 0);
+    } finally {
+        await database.close();
+    }
+});
+
 test('outbox insert failure rolls back the app_deleted status change', async () => {
     const database = new PGlite();
 
