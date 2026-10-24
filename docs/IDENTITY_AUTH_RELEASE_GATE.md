@@ -276,3 +276,13 @@ Candidate PR #2 now includes `internal-assertion.js` and requires it in middlewa
 The BFF signing example, required env vars and exact claims are documented in [docs/BFF_ASSERTION_CONTRACT.md](https://github.com/jaiioffice-svg/linc-tech-ex-backend/blob/fix/linc-backend-clean-pr/docs/BFF_ASSERTION_CONTRACT.md). The Client/BFF integration is **not yet implemented or confirmed as the approved deployed Client**. The legacy archive's opaque session must first be verified by its own trusted BFF using the authoritative session store; it must not be forwarded directly to the Backend. The current verifier validates the jti format but does not yet consume jti from a replay store; short TTL, HTTPS, no token logging and idempotent terminal alert handling mitigate the immediate risk but do not equal one-time replay prevention.
 
 App-delete handling was also made idempotent for an already-terminal `app_deleted` profile to avoid re-emitting the same alert event on duplicate requests. Real notification delivery still needs an outbox and provider integration.
+
+
+
+## Signed assertion integration test verified — 2026-10-24
+
+Candidate Runtime/Test commit `8e846ca9b7182cf3140e493b43925ad4286a1f4b` includes the HS256 verifier and an Express-level route test. It confirms: service key alone is insufficient; missing assertion is rejected with HTTP 401; wrong route scope is rejected; a body user ID that differs from the assertion subject is rejected with HTTP 403; and a valid assertion still receives HTTP 503 when Supabase configuration is intentionally absent, before any live DB operation. App-delete state transition is idempotent to suppress duplicate alert emission for an already-terminal profile.
+
+Latest isolated Sandbox verification: **61/61 tests pass**, 85 packages installed via `npm ci`, `npm audit` 0 vulnerabilities, syntax checks and Vercel branch-scope/config and diff checks pass. GitHub Actions [run #225](https://github.com/jaiioffice-svg/linc-tech-ex-backend/actions/runs/40078015703) passed. Strict assertions now reject unsupported JWT header fields and an `nbf` claim that is not-before the token's own expiry.
+
+The implementation is a backend-side verifier only. It does not validate the Client's opaque session itself, does not consume `jti` from a replay store, and does not configure `LINC_INTERNAL_AUTH_SECRET`. The trusted BFF must validate the session and sign assertions using the documented [BFF contract](https://github.com/jaiioffice-svg/linc-tech-ex-backend/blob/fix/linc-backend-clean-pr/docs/BFF_ASSERTION_CONTRACT.md). Keep PR #2 Draft/unmerged, deployment paused, and do not claim authenticated Preview acceptance or Production recovery.
