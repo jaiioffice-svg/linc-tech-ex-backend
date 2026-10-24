@@ -155,6 +155,12 @@ Decision as of 2026-10-24: continue with Draft PR #2 (`fix/linc-backend-clean-pr
 - Do not merge or change Production just to make `/health` return 200. The main branch also has an end-user authorization gap and local-file persistence, so a startup-only patch would leave a broken release.
 - Continue to keep PR #2 Draft/unmerged. Its current fail-closed identity gate deliberately returns 503 on user-scoped routes until a trusted identity verifier is implemented.
 
+### Important: PR #21 preflight versus PR #2 migration contract
+- PR #21 (`docs/supabase-preflight-rls-grants-20261024`) is based on a separate Client-review branch and its `db.js` contract differs from PR #2. Its **read-only preflight SQL** can be used only as a generic inspection aid after the correct non-production project is identified.
+- Do **not** blindly apply any of PR #21's migration scripts to prepare the PR #2 Candidate database. The PR #21 base migration does not declare the `data jsonb` column that PR #2's `db.js` reads and writes; applying that schema alone can leave the Candidate unable to query/persist profiles. Timestamp conversion and grant scripts in PR #21 also change live schema/privileges and require actual-project review.
+- For PR #2, reconcile the live schema against its own base migration `supabase/migrations/20261022_002_linc_core.sql`, which defines `linc_users.data jsonb`, the epoch-millisecond heartbeat fields, and the service-role access expected by that Candidate. Treat any needed reconciliation as a new reviewed migration after the read-only preflight and backup/recovery plan.
+- The static migration-contract test in PR #21 proves only that **PR #21's** `db.js` matches **PR #21's** migration. It does not prove PR #2's runtime contract or any live Supabase schema. No SQL has been applied to either Preview or Production by this work.
+
 ### Stage 2 — establish a trustworthy database target
 - The read-only Vercel environment inventory showed `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` targeted to Preview only; neither was listed for Production. No environment values were decrypted.
 - Historical Preview logs also need remediation: deployment `dpl_AuKcWvqteMomhGvGGmno4BVdDMi5` on this candidate branch recorded Supabase permission failures (HTTP 401 / Postgres `42501`). A separate older Preview diagnostic deployment `dpl_26QDmjCdgaoqpQZENafGP7JY6PpE` logged a configured API token classified as JWT role `anon`. Do not infer that the latest Preview has a valid service-role credential from the variable name alone.
