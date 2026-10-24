@@ -27,8 +27,8 @@ The Backend takes the user ID from the signed `sub` claim. A body-supplied `user
 
 | Method / path | Purpose | Request JSON | Successful response |
 |---|---|---|---|
-| POST `/api/v1/users/register` | Create or update the verified user's profile | Optional `userId` consistency check; optional `grade` string up to 32 characters. Creation defaults `grade` to `M1`. | HTTP 201 for a new profile; HTTP 200 for an existing profile. `{ "success": true, "message": "User profile registered" }` or `"User profile updated"`. |
-| POST `/api/v1/heartbeat` | Record a heartbeat for the verified user | Optional `userId` consistency check; optional `grade` string up to 32 characters. | HTTP 201 when it creates a missing profile; HTTP 200 when it updates an existing profile, with `{ "success": true, "message": "Heartbeat acknowledged" }`. |
+| POST `/api/v1/users/register` | Create or update the verified user's profile | Optional canonical `userId` consistency check; optional non-empty trimmed `grade` string up to 32 characters. Creation defaults `grade` to `M1`. | HTTP 201 for a new profile; HTTP 200 for an existing profile. `{ "success": true, "message": "User profile registered" }` or `"User profile updated"`. |
+| POST `/api/v1/heartbeat` | Record a heartbeat for the verified user | Optional canonical `userId` consistency check; optional non-empty trimmed `grade` string up to 32 characters. | HTTP 201 when it creates a missing profile; HTTP 200 when it updates an existing profile, with `{ "success": true, "message": "Heartbeat acknowledged" }`. |
 | POST `/api/v1/alert/delete` | Record an app-termination/deletion event for the verified user | Optional `userId` consistency check; no `grade` or additional fields. | HTTP 200 with `success`, `alreadyRecorded`, `notificationStatus` and a message; HTTP 404 if the target profile does not exist. |
 
 Registration and heartbeat support only `userId` and `grade`; the delete route supports only `userId`. Any field outside the per-route allowlist, including client-supplied `guardianLineId`, nested `auth`, `role`, `isAdmin`, or `grade` on the delete route, is rejected with HTTP 400 (`UNSUPPORTED_FIELD`). Even if a handler is called directly, controllers must not use request-supplied fields to establish the authenticated user or verified guardian identity.
@@ -49,8 +49,8 @@ Never tell the user or guardian that a message was sent merely because the API r
 - JSON request bodies are limited to 64 KiB.
 - The service rejects malformed JSON with HTTP 400.
 - A body over the configured limit is rejected with HTTP 413.
-- User ID, when present, must be a non-empty string of no more than 200 characters.
-- Grade, when present, must be a string of no more than 32 characters. The current API does not enforce an M1–M6 enum.
+- User ID, when present, must be a non-empty, already-trimmed string of no more than 200 characters.
+- Grade, when present, must be a non-empty, already-trimmed string of no more than 32 characters. The current API does not enforce an M1–M6 enum.
 - CORS grants browser access only to exact valid origins listed in `LINC_ALLOWED_ORIGINS`. CORS is not authentication.
 - A distributed rate limiter is **not** implemented in this Candidate. Do not assume that HTTP 429 protection exists; add a shared-store rate limiter and abuse thresholds before exposing sensitive routes broadly. A per-instance in-memory limiter would not be a reliable serverless control.
 
