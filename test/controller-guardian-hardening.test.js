@@ -121,6 +121,54 @@ test('immediate-delete alert uses the authenticated profile and stored guardian 
     assert.equal(readState().users['delete-user'].status, 'app_deleted');
 });
 
+test('repeated app-delete requests do not re-record or re-emit the same terminal event', async () => {
+    fs.writeFileSync(process.env.LINC_DATA_FILE, JSON.stringify({
+        schools: {},
+        users: {
+            'idempotent-delete-user': {
+                userId: 'idempotent-delete-user',
+                grade: 'M1',
+                guardianLineId: 'verified-guardian-line-id',
+                createdAt: Date.now(),
+                status: 'active'
+            }
+        },
+        revenue: { total: 0 }
+    }));
+
+    let alertCount = 0;
+    const firstResponse = mockResponse();
+    const request = {
+        auth: { userId: 'idempotent-delete-user' },
+        body: { userId: 'idempotent-delete-user' }
+    };
+
+    await require('../controllers').handleImmediateDelete(
+        request,
+        firstResponse,
+        () => { alertCount += 1; }
+    );
+
+    const firstState = readState().users['idempotent-delete-user'];
+    const firstDeletedAt = firstState.deletedAt;
+    assert.equal(firstResponse.statusCode, 200);
+    assert.equal(firstResponse.body.alreadyRecorded, false);
+    assert.equal(alertCount, 1);
+
+    const secondResponse = mockResponse();
+    await require('../controllers').handleImmediateDelete(
+        request,
+        secondResponse,
+        () => { alertCount += 1; }
+    );
+
+    const secondState = readState().users['idempotent-delete-user'];
+    assert.equal(secondResponse.statusCode, 200);
+    assert.equal(secondResponse.body.alreadyRecorded, true);
+    assert.equal(secondState.deletedAt, firstDeletedAt);
+    assert.equal(alertCount, 1);
+});
+
 test('heartbeat cannot reactivate a profile marked app_deleted', async () => {
     fs.writeFileSync(process.env.LINC_DATA_FILE, JSON.stringify({
         schools: {},
