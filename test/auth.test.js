@@ -30,6 +30,31 @@ test('returns 503 when API key is not configured', () => {
     }
 });
 
+test('returns 503 when configured API keys are padded or contain control characters', () => {
+    const previous = process.env.LINC_API_KEY;
+    const invalidKeys = [
+        ' ' + 'x'.repeat(32),
+        'x'.repeat(32) + ' ',
+        'x'.repeat(32) + String.fromCharCode(10),
+        'x'.repeat(16) + String.fromCharCode(1) + 'x'.repeat(16)
+    ];
+
+    try {
+        for (const key of invalidKeys) {
+            process.env.LINC_API_KEY = key;
+            const res = mockResponse();
+            let nextCalled = false;
+            validateApiKey(mockRequest(key), res, () => { nextCalled = true; });
+            assert.equal(res.statusCode, 503);
+            assert.equal(res.body.message, 'API authentication is not configured');
+            assert.equal(nextCalled, false);
+        }
+    } finally {
+        if (previous === undefined) delete process.env.LINC_API_KEY;
+        else process.env.LINC_API_KEY = previous;
+    }
+});
+
 test('returns 401 when request has no API key', () => {
     const previous = process.env.LINC_API_KEY;
     process.env.LINC_API_KEY = 'test-only-api-key-that-is-definitely-over-32-bytes';
