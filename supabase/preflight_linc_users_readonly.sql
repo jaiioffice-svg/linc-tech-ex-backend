@@ -1,9 +1,11 @@
 -- L!nc Supabase preflight: READ-ONLY checks before applying
 -- supabase/migrations/20261024_linc_users_backend.sql
 -- Run this file in Supabase SQL Editor and inspect each result.
--- IMPORTANT: run section 1 first. If it returns zero rows, STOP here;
--- sections 2-9 require the table to exist. Do not apply a migration until
--- the existing schema and ownership/authorization plan have been reviewed.
+-- IMPORTANT: DO NOT execute this whole file at once on an unknown database.
+-- First select and execute ONLY the query in section 1.
+-- If section 1 returns zero rows, STOP; do not execute sections 2-9.
+-- If section 1 confirms the table exists, then select and execute sections 2-9.
+-- Do not apply a migration until the schema and ownership/authorization plan are reviewed.
 -- This file intentionally performs no INSERT, UPDATE, DELETE, ALTER, or CREATE.
 -- Privacy: duplicate checks return aggregate counts only, never user identifiers.
 
