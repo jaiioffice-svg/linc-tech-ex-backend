@@ -38,11 +38,33 @@ where schemaname = 'public'
   and tablename = 'linc_users'
 order by indexname;
 
--- 4) Count existing rows (does not expose row contents).
+-- 4) Inspect whether row-level security is enabled/forced on the table.
+select
+  n.nspname as schema_name,
+  c.relname as table_name,
+  c.relrowsecurity as rls_enabled,
+  c.relforcerowsecurity as rls_forced
+from pg_class c
+join pg_namespace n on n.oid = c.relnamespace
+where n.nspname = 'public'
+  and c.relname = 'linc_users'
+  and c.relkind in ('r', 'p');
+
+-- 5) Inspect explicit table grants; this is read-only and does not change privileges.
+select
+  grantee,
+  privilege_type,
+  is_grantable
+from information_schema.role_table_grants
+where table_schema = 'public'
+  and table_name = 'linc_users'
+order by grantee, privilege_type;
+
+-- 6) Count existing rows (does not expose row contents).
 select count(*) as existing_row_count
 from public.linc_users;
 
--- 5) Check duplicate user_id values. Any returned row means the migration's
+-- 7) Check duplicate user_id values. Any returned row means the migration's
 -- unique index may fail and data must be reviewed before schema changes.
 select user_id, count(*) as duplicate_count
 from public.linc_users
@@ -51,13 +73,13 @@ having count(*) > 1
 order by duplicate_count desc
 limit 100;
 
--- 6) Check null/blank identifiers before relying on user_id uniqueness.
+-- 8) Check null/blank identifiers before relying on user_id uniqueness.
 select
   count(*) filter (where user_id is null) as null_user_id_count,
   count(*) filter (where btrim(user_id) = '') as blank_user_id_count
 from public.linc_users;
 
--- 7) Check status distribution and rows missing timestamps, without exposing IDs.
+-- 9) Check status distribution and rows missing timestamps, without exposing IDs.
 select
   coalesce(status, '<NULL>') as status,
   count(*) as row_count,
