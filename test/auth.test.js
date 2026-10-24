@@ -123,3 +123,22 @@ test('returns 503 when configured API key is shorter than the minimum length', (
         else process.env.LINC_API_KEY = previous;
     }
 });
+
+test('returns 401 when a same-length API key is incorrect', () => {
+    const previous = process.env.LINC_API_KEY;
+    const configuredKey = 'test-only-api-key-that-is-definitely-over-32-bytes';
+    process.env.LINC_API_KEY = configuredKey;
+    try {
+        const res = mockResponse();
+        let nextCalled = false;
+        validateApiKey(mockRequest('x'.repeat(Buffer.byteLength(configuredKey, 'utf8'))), res, () => {
+            nextCalled = true;
+        });
+        assert.equal(res.statusCode, 401);
+        assert.equal(res.body.message, 'Unauthorized connection');
+        assert.equal(nextCalled, false);
+    } finally {
+        if (previous === undefined) delete process.env.LINC_API_KEY;
+        else process.env.LINC_API_KEY = previous;
+    }
+});
