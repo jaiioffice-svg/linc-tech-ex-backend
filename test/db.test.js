@@ -552,6 +552,43 @@ test('saveUser persists a profile using a Supabase upsert', async () => {
     }
 });
 
+test('saveUser normalizes schema defaults before Supabase persistence', async () => {
+    const db = require('../db');
+    const originalFetch = global.fetch;
+    let requestOptions;
+    global.fetch = async (_url, options) => {
+        requestOptions = options;
+        return new Response(null, { status: 204 });
+    };
+
+    try {
+        await withEnv({
+            VERCEL: '1',
+            VERCEL_ENV: 'preview',
+            SUPABASE_URL: 'https://example-project.supabase.co',
+            SUPABASE_SERVICE_ROLE_KEY: 'sb_secret_test_only'
+        }, async () => {
+            const input = { userId: 'defaults-user' };
+            assert.equal(await db.saveUser(input), input);
+        });
+
+        const row = JSON.parse(requestOptions.body);
+        assert.equal(row.user_id, 'defaults-user');
+        assert.equal(row.grade, 'M1');
+        assert.equal(row.guardian_line_id, null);
+        assert.equal(row.status, 'active');
+        assert.equal(row.last_heartbeat, null);
+        assert.equal(Number.isSafeInteger(row.created_at), true);
+        assert.equal(row.data.grade, 'M1');
+        assert.equal(row.data.guardianLineId, null);
+        assert.equal(row.data.status, 'active');
+        assert.equal(row.data.lastHeartbeat, null);
+        assert.equal(row.data.createdAt, row.created_at);
+    } finally {
+        global.fetch = originalFetch;
+    }
+});
+
 test('recordAppTermination rejects an already-recorded RPC response that claims a pending event', async () => {
     const db = require('../db');
     const originalFetch = global.fetch;
