@@ -37,7 +37,7 @@ async function withEnvAsync(values, callback) {
 
 test('Supabase config requires both URL and service key', () => {
     withEnv({ SUPABASE_URL: 'https://example.supabase.co', SUPABASE_SERVICE_ROLE_KEY: undefined }, () => {
-        assert.equal(hasSupabaseConfig(), false, `malformed Supabase config must be rejected: ${JSON.stringify(values)}`);
+        assert.equal(hasSupabaseConfig(), false);
     });
     withEnv({ SUPABASE_URL: undefined, SUPABASE_SERVICE_ROLE_KEY: 'test-only-key' }, () => {
         assert.equal(hasSupabaseConfig(), false);
