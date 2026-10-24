@@ -229,3 +229,18 @@ Added `@electric-sql/pglite` as a development-only dependency and `test/replay-m
 Exact code/test commit `e117545e7333d96f91f1881165290f37b7aa7c27` passed **72/72 tests** in an isolated Vercel Sandbox after a clean `npm ci` (86 packages); `npm audit` reported 0 vulnerabilities; syntax, Vercel branch-scope/config and `git diff --check` passed. GitHub Actions [run #281](https://github.com/jaiioffice-svg/linc-tech-ex-backend/actions/runs/40081403065) succeeded.
 
 This materially improves SQL validation, but PGlite is an in-memory PostgreSQL-compatible engine. It does not test actual Supabase PostgREST routing, production roles/extensions/configuration, network credentials, or deployed RLS policy interactions. The migration is **not applied to Supabase or any persistent database**. Confirm the intended non-production Supabase project and test there before treating the database gate as closed.
+
+## 20. Latest read-only environment inventory and Production probe — 2026-10-24 09:22 UTC (16:22 Thailand)
+
+Vercel project environment-variable metadata was retrieved for project `linc-tech-ex-backend` under the correct team scope, with decryption disabled. Metadata (names/targets only) shows:
+- `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, and `LINC_API_KEY` are configured for Preview only, not Production.
+- `LINE_CHANNEL_ACCESS_TOKEN` targets both Production and Preview.
+- `LINE_CHANNEL_SECRET` targets Production only.
+- No `LINC_INTERNAL_AUTH_SECRET` or `LINC_ALLOWED_ORIGINS` appears in the returned project inventory.
+No environment-variable values were decrypted, read, created, or changed. The target Supabase project identity remains unknown because the URL value was intentionally not read; therefore Preview-vs-Production database isolation is still unproven. With no configured `LINC_INTERNAL_AUTH_SECRET`, the Candidate's protected route identity verifier would fail closed with HTTP 503 if deployed as-is.
+
+Latest read-only Production GETs at 09:22 UTC again returned HTTP 500 `FUNCTION_INVOCATION_FAILED`:
+- `GET /health`: request ID `sin1::vnrtl-1792833730755-752ce94541ad`
+- `GET /ready`: request ID `sin1::2jmpn-1792833731860-95b962b160ed`
+
+Vercel's active Production deployment remains `dpl_2ELeGpWoXTL6wFFvLEXxrLZzRgAk` from `main` SHA `336e2fcdd1b9f0841432817dcafe955b45700eef`. The Candidate remains Draft/unmerged with automatic deployments paused on its branch. No Production code/settings, credentials, SQL, persistent data, or notifications were changed.
