@@ -28,7 +28,7 @@ test('replay migration creates a durable unique JTI store with expiry index', ()
 test('replay RPC uses fixed search_path and atomic insert without upsert', () => {
     assert.match(migration, /create or replace function public\.linc_consume_auth_assertion/i);
     assert.match(migration, /security definer/i);
-    assert.match(migration, /set search_path = public, pg_temp/i);
+    assert.match(migration, /set search_path = pg_catalog, public, pg_temp/i);
     assert.match(migration, /delete from public\.linc_auth_assertion_replays\s+where expires_at <= v_now/i);
     assert.match(migration, /insert into public\.linc_auth_assertion_replays\s*\(jti, expires_at\)/i);
     assert.match(migration, /on conflict \(jti\) do nothing/i);
