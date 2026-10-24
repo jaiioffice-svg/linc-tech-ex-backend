@@ -271,6 +271,29 @@ test('authenticated registration API integration with isolated Supabase boundary
         assert.equal(calls.length, before);
     });
 
+    await t.test('JSON null body returns INVALID_BODY instead of a false cross-account error', async () => {
+        const before = calls.length;
+        const response = await nativeFetch(`${baseUrl}/api/v1/users/register`, {
+            method: 'POST',
+            headers: {
+                'content-type': 'application/json',
+                'x-linc-api-key': API_KEY,
+                'x-linc-user-assertion': createAssertion({ jti: 'test-assertion-id-000010' })
+            },
+            body: 'null'
+        });
+
+        assert.equal(response.status, 400);
+        assert.deepEqual(await response.json(), {
+            success: false,
+            code: 'INVALID_BODY',
+            message: 'Request body must be a JSON object'
+        });
+        const newCalls = calls.slice(before);
+        assert.equal(newCalls.length, 1);
+        assert.equal(newCalls[0].path.endsWith('/rpc/linc_consume_auth_assertion'), true);
+    });
+
     await t.test('cross-account body identity mismatch is rejected before replay storage or profile access', async () => {
         const before = calls.length;
         const denied = await nativeFetch(`${baseUrl}/api/v1/users/register`, {
