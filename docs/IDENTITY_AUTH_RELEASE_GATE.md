@@ -133,6 +133,43 @@ Do **not** make a one-line Production edit, promote the current candidate automa
 
 No Production code, alias, environment variable, secret, database row, migration, or notification setting was changed during this recheck.
 
+## Recommended next path — one candidate, staged verification
+
+Decision as of 2026-10-24: continue with Draft PR #2 (`fix/linc-backend-clean-pr`) as the single Backend release candidate; do not start another overlapping Runtime branch. PR #3 documents the earlier serverless-persistence change, but its route contract does not include the fail-closed verified-end-user gate now present in PR #2.
+
+### Stage 1 — keep Production stable and capture evidence
+- Production `/health` and `/ready` both currently return HTTP 500 `FUNCTION_INVOCATION_FAILED`. This is a confirmed availability incident.
+- Do not merge or change Production just to make `/health` return 200. The main branch also has an end-user authorization gap and local-file persistence, so a startup-only patch would leave a broken release.
+- Continue to keep PR #2 Draft/unmerged. Its current fail-closed identity gate deliberately returns 503 on user-scoped routes until a trusted identity verifier is implemented.
+
+### Stage 2 — establish a trustworthy database target
+- The read-only Vercel environment inventory showed `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` targeted to Preview only; neither was listed for Production. No environment values were decrypted.
+- Historical Preview logs also need remediation: deployment `dpl_AuKcWvqteMomhGvGGmno4BVdDMi5` on this candidate branch recorded Supabase permission failures (HTTP 401 / Postgres `42501`). A separate older Preview diagnostic deployment `dpl_26QDmjCdgaoqpQZENafGP7JY6PpE` logged a configured API token classified as JWT role `anon`. Do not infer that the latest Preview has a valid service-role credential from the variable name alone.
+- Confirm the intended Supabase project independently and prove it is a non-Production Preview project. Then verify its `public.linc_users` schema, role/grants, RLS and service-key role using the read-only preflight described by [PR #21](https://github.com/jaiioffice-svg/linc-tech-ex-backend/pull/21). Run it only after the target project URL is confirmed; stop if the expected table/schema is missing.
+- Only after the project is identified, correct the Preview-only Vercel variables through an authorized configuration change. Do not copy Production credentials into Preview, decrypt secrets for this review, or add new database grants speculatively.
+
+### Stage 3 — settle the Client/session contract
+- The inspected Library archive is unconfirmed as the approved/deployed Client. It uses relative `/api/...` paths, zero `/api/v1/` references, and its guardian pairing flow does not prove LINE provider identity.
+- Identify the actual deployed Client source/commit and whether it calls a same-origin BFF or a separate Backend. Select the single authoritative server-verified session contract only after that evidence exists.
+- Implement the verifier that populates `req.auth.userId`; test expired/revoked credentials, account A attempting account B, profile claiming, deletion authorization, and verified guardian pairing. Never embed `LINC_API_KEY` in a browser/mobile bundle.
+
+### Stage 4 — deliberate Preview release and acceptance
+When the daily Vercel build quota/access allows, trigger one deliberate Preview deployment of the reviewed candidate; do not re-enable noisy auto-deploys for every documentation commit.
+Acceptance must include:
+1. `GET /health` returns 200 without trying to write local files.
+2. `GET /ready` returns 200 against the confirmed isolated Preview Supabase project.
+3. Missing/invalid end-user credentials are rejected; valid credentials resolve the server-side principal.
+4. Synthetic test user A cannot read/write/delete user B; the same data persists across separate serverless instances.
+5. Guardian pairing is marked verified only after provider-authenticated confirmation.
+6. Any notification test is stubbed/sandboxed; no real guardian LINE message is sent.
+7. Cleanup of synthetic Preview records is verified and logged.
+
+### Stage 5 — Production release decision
+Production release is a separate, explicitly authorized action after all preceding gates pass. It requires a reviewed data-migration/back-up plan, correctly scoped Production database configuration, a tested rollback path, monitored post-deploy health/readiness and authenticated end-user integration tests. Production must not be promoted merely because the deployment is marked READY or because unit tests pass.
+
+### Immediate next engineering task
+Continue in the existing PR #2 by reviewing and tightening the **testable integration boundary**, not by guessing an identity provider or changing Production. The concrete blockers are: (a) no approved Client/source contract, (b) no verified Preview Supabase target/service-role permission, and (c) no Production Supabase configuration shown in the metadata inventory. Record findings in the current release gate and only deploy once the relevant gate can be objectively tested.
+
 ## Release decision
 
 Keep PR #2 in Draft/unmerged state and Issue #22 open. Before release, confirm the approved Client and request/auth contract, implement server-side credential verification with expiry/revocation and principal-derived owner isolation, verify guardian pairing, obtain authorized Preview POST testing, and confirm Preview database isolation before any synthetic CRUD. Passing unit/CI/health checks is not proof that real user authentication or data isolation is complete.
