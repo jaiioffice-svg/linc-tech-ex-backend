@@ -367,7 +367,7 @@ test('authenticated registration API integration with isolated Supabase boundary
         });
         const newCalls = calls.slice(before);
         assert.equal(newCalls.length, 2);
-        assert.match(newCalls[1].path, /\\/rpc\\/linc_record_app_termination$/);
+        assert.equal(newCalls[1].path.endsWith('/rpc/linc_record_app_termination'), true);
         assert.equal(newCalls.every(call => call.path.includes('/rpc/linc_')), true);
     });
 
@@ -393,7 +393,7 @@ test('authenticated registration API integration with isolated Supabase boundary
         });
         const newCalls = calls.slice(before);
         assert.equal(newCalls.length, 2);
-        assert.match(newCalls[1].path, /\\/rpc\\/linc_record_app_termination$/);
+        assert.equal(newCalls[1].path.endsWith('/rpc/linc_record_app_termination'), true);
         assert.equal(newCalls.every(call => call.path.includes('/rpc/linc_')), true);
     });
 });
