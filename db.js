@@ -1,5 +1,6 @@
 const fs = require('fs');
 const path = require('path');
+const crypto = require('crypto');
 
 const LOCAL_DB_FILE = process.env.LINC_DATA_FILE || path.join(__dirname, 'linc_data.json');
 const SUPABASE_TABLE = 'linc_users';
@@ -22,14 +23,19 @@ function assertDatabaseAvailable() {
 }
 
 function emptyState() {
-    return { schools: {}, users: {}, revenue: { total: 0 } };
+    return { schools: {}, users: {}, revenue: { total: 0 }, outbox: [] };
 }
 
 function readLocalState() {
     if (!fs.existsSync(LOCAL_DB_FILE)) {
         fs.writeFileSync(LOCAL_DB_FILE, JSON.stringify(emptyState(), null, 2), 'utf8');
     }
-    return JSON.parse(fs.readFileSync(LOCAL_DB_FILE, 'utf8'));
+    const state = JSON.parse(fs.readFileSync(LOCAL_DB_FILE, 'utf8'));
+    if (!Array.isArray(state.outbox)) state.outbox = [];
+    if (!state.users || typeof state.users !== 'object' || Array.isArray(state.users)) {
+        state.users = {};
+    }
+    return state;
 }
 
 function writeLocalState(state) {
@@ -203,6 +209,130 @@ async function saveUser(user) {
 }
 
 
+async function recordAppTermination(userId) {
+    if (
+        typeof userId !== 'string' ||
+        !userId.trim() ||
+        userId.length > 200
+    ) {
+        throw new TypeError('A valid userId is required');
+    }
+
+    assertDatabaseAvailable();
+
+    if (hasSupabaseConfig()) {
+        const result = await supabaseRequest('rpc/linc_record_app_termination', {
+            method: 'POST',
+            headers: { Prefer: 'return=representation' },
+            body: JSON.stringify({ p_user_id: userId })
+        });
+
+        const validBase =
+            result &&
+            typeof result === 'object' &&
+            !Array.isArray(result) &&
+            typeof result.found === 'boolean' &&
+            typeof result.alreadyRecorded === 'boolean';
+
+        const validFoundProfile = result.found === false ||
+            (
+                typeof result.guardianLinked === 'boolean' &&
+                (
+                    result.alreadyRecorded === true ||
+                    (
+                        typeof result.eventId === 'string' &&
+                        /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(result.eventId) &&
+                        ['pending', 'blocked'].includes(result.eventStatus) &&
+                        Number.isSafeInteger(result.deletedAt)
+                    )
+                )
+            );
+
+        if (!validBase || !validFoundProfile) {
+            const error = new Error('App termination RPC returned an unexpected response');
+            error.code = 'DB_UNAVAILABLE';
+            throw error;
+        }
+
+        return {
+            found: result.found,
+            alreadyRecorded: result.alreadyRecorded,
+            eventId: result.eventId || null,
+            eventStatus: result.eventStatus || null,
+            guardianLinked: Boolean(result.guardianLinked),
+            deletedAt: Number.isSafeInteger(result.deletedAt) ? result.deletedAt : null
+        };
+    }
+
+    const state = readLocalState();
+    if (!Object.hasOwn(state.users, userId)) {
+        return {
+            found: false,
+            alreadyRecorded: false,
+            eventId: null,
+            eventStatus: null,
+            guardianLinked: false,
+            deletedAt: null
+        };
+    }
+
+    const user = state.users[userId];
+    const guardianLineId = typeof user.guardianLineId === 'string' &&
+        user.guardianLineId.trim()
+        ? user.guardianLineId
+        : null;
+    const guardianLinked = Boolean(guardianLineId);
+    const isAlreadyDeleted =
+        user.status === 'app_deleted' ||
+        (user.data && user.data.status === 'app_deleted');
+
+    if (isAlreadyDeleted) {
+        user.status = 'app_deleted';
+        writeLocalState(state);
+        return {
+            found: true,
+            alreadyRecorded: true,
+            eventId: null,
+            eventStatus: null,
+            guardianLinked,
+            deletedAt: Number.isSafeInteger(user.deletedAt) ? user.deletedAt : null
+        };
+    }
+
+    const deletedAt = Date.now();
+    const eventId = crypto.randomUUID();
+    const eventStatus = guardianLinked ? 'pending' : 'blocked';
+
+    user.status = 'app_deleted';
+    user.deletedAt = deletedAt;
+    state.outbox.push({
+        eventId,
+        userId,
+        recipientLineId: guardianLineId,
+        eventType: 'APP_TERMINATION_SIGNAL',
+        eventStatus,
+        attempts: 0,
+        nextAttemptAt: deletedAt,
+        lastErrorCode: null,
+        payload: { reason: 'APP_TERMINATION_SIGNAL' },
+        createdAt: deletedAt,
+        sentAt: null
+    });
+
+    // Profile transition and outbox event are persisted in the same local-file write.
+    writeLocalState(state);
+
+    return {
+        found: true,
+        alreadyRecorded: false,
+        eventId,
+        eventStatus,
+        guardianLinked,
+        deletedAt
+    };
+}
+
+
 async function consumeInternalAssertion(assertionId, expiresAt) {
     // Replay protection must use durable shared storage, never the local JSON
     // adapter or an in-memory cache that differs between serverless instances.
@@ -276,6 +406,7 @@ module.exports = {
     getUser,
     saveUser,
     checkDatabaseConnection,
+    recordAppTermination,
     consumeInternalAssertion,
     classifyDatabaseFailure,
     calculateWeightedRevenue
