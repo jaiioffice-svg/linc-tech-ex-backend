@@ -150,7 +150,8 @@ test('malformed, oversized and non-HS256 assertions are rejected', async () => {
     const results = await Promise.all([
         run('not.a.valid.jwt'),
         run('a'.repeat(4100)),
-        run(signAssertion({}, SECRET, { alg: 'none' }))
+        run(signAssertion({}, SECRET, { alg: 'none' })),
+        run(signAssertion({}, SECRET, { crit: ['exp'] }))
     ]);
 
     for (const result of results) {
@@ -188,6 +189,7 @@ test('wrong issuer, audience, missing subject and missing jti are rejected', asy
 });
 
 test('assertion scope must exactly match one allowed POST route', async () => {
+    const now = Math.floor(Date.now() / 1000);
     const wrongScope = await run(signAssertion({ scope: '/api/v1/alert/delete' }));
     const wrongPath = await run(signAssertion(), {
         request: { path: '/api/v1/users/register' }
@@ -195,8 +197,13 @@ test('assertion scope must exactly match one allowed POST route', async () => {
     const wrongMethod = await run(signAssertion(), {
         request: { method: 'GET' }
     });
+    const notBeforeAfterExpiry = await run(signAssertion({
+        iat: now,
+        exp: now + 30,
+        nbf: now + 30
+    }));
 
-    for (const result of [wrongScope, wrongPath, wrongMethod]) {
+    for (const result of [wrongScope, wrongPath, wrongMethod, notBeforeAfterExpiry]) {
         assert.equal(result.res.statusCode, 401);
         assert.equal(result.nextCalled, false);
     }
