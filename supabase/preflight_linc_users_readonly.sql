@@ -1,6 +1,9 @@
 -- L!nc Supabase preflight: READ-ONLY checks before applying
 -- supabase/migrations/20261024_linc_users_backend.sql
 -- Run this file in Supabase SQL Editor and inspect each result.
+-- IMPORTANT: run section 1 first. If it returns zero rows, STOP here;
+-- sections 2-9 require the table to exist. Do not apply a migration until
+-- the existing schema and ownership/authorization plan have been reviewed.
 -- This file intentionally performs no INSERT, UPDATE, DELETE, ALTER, or CREATE.
 -- Privacy: duplicate checks return aggregate counts only, never user identifiers.
 
@@ -74,24 +77,24 @@ select
   coalesce(sum(group_size - 1), 0) as excess_duplicate_row_count
 from (
   select count(*) as group_size
-  from public.linc_users
-  group by user_id
+  from public.linc_users as u
+  group by to_jsonb(u)->>'user_id'
   having count(*) > 1
 ) duplicate_groups;
 
 -- 8) Check null/blank identifiers before relying on user_id uniqueness.
 select
-  count(*) filter (where user_id is null) as null_user_id_count,
-  count(*) filter (where btrim(user_id) = '') as blank_user_id_count
-from public.linc_users;
+  count(*) filter (where to_jsonb(u)->>'user_id' is null) as null_or_missing_user_id_count,
+  count(*) filter (where btrim(coalesce(to_jsonb(u)->>'user_id', '')) = '') as blank_user_id_count
+from public.linc_users as u;
 
 -- 9) Check status distribution and rows missing timestamps, without exposing IDs.
 select
-  coalesce(status, '<NULL>') as status,
+  coalesce(to_jsonb(u)->>'status', '<NULL>') as status,
   count(*) as row_count,
-  count(*) filter (where created_at is null) as missing_created_at_count,
-  count(*) filter (where last_heartbeat is null) as missing_last_heartbeat_count,
-  count(*) filter (where updated_at is null) as missing_updated_at_count
-from public.linc_users
-group by status
+  count(*) filter (where to_jsonb(u)->>'created_at' is null) as missing_or_null_created_at_count,
+  count(*) filter (where to_jsonb(u)->>'last_heartbeat' is null) as missing_or_null_last_heartbeat_count,
+  count(*) filter (where to_jsonb(u)->>'updated_at' is null) as missing_or_null_updated_at_count
+from public.linc_users as u
+group by to_jsonb(u)->>'status'
 order by status;
