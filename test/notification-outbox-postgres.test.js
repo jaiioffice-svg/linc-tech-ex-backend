@@ -218,14 +218,14 @@ test('termination RPC rejects blank, padded, and oversized user IDs', async () =
 });
 
 
-test('dispatch-disable migration blocks every undelivered legacy event and clears outbox recipients', async () => {
+test('outbox upgrade migrations disable unverified dispatch, clear recipients, and preserve terminal labels', async () => {
     const database = new PGlite();
 
     try {
         await applyMigrations(database, { includeOutboxUpgrades: false });
         await seedUser(database, 'legacy-outbox-user', 'legacy-line-id');
 
-        // Recreate a pre-guard table with the previous permissive status/recipient check.
+        // Recreate a pre-hardening schema with a permissive status/recipient check.
         await database.exec(`
             ALTER TABLE public.linc_notification_outbox
                 DROP CONSTRAINT linc_notification_outbox_recipient_status_check;
