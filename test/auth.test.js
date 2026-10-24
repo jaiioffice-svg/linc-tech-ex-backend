@@ -142,3 +142,18 @@ test('returns 401 when a same-length API key is incorrect', () => {
         else process.env.LINC_API_KEY = previous;
     }
 });
+
+test('end-user route gate rejects noncanonical or oversized principal IDs', () => {
+    for (const userId of [' account-a ', 'a'.repeat(201)]) {
+        const res = mockResponse();
+        let nextCalled = false;
+        requireVerifiedEndUser({
+            auth: { userId },
+            body: {}
+        }, res, () => { nextCalled = true; });
+
+        assert.equal(res.statusCode, 503);
+        assert.equal(res.body.message, 'End-user identity verification is not configured');
+        assert.equal(nextCalled, false);
+    }
+});
