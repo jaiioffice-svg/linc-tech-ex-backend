@@ -1,6 +1,7 @@
 const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
+const { notFoundHandler, errorHandler } = require('./error-handler');
 const {
     handleUserRegistration,
     handleHeartbeat,
@@ -126,51 +127,8 @@ async function readinessHandler(req, res) {
 app.get('/ready', readinessHandler);
 app.get('/api/ready', readinessHandler);
 
-app.use((req, res) => {
-    return res.status(404).json({
-        success: false,
-        code: 'ROUTE_NOT_FOUND',
-        message: 'The requested route was not found'
-    });
-});
-
-app.use((error, req, res, next) => {
-    if (res.headersSent) {
-        return next(error);
-    }
-
-    let status = 500;
-    let code = 'INTERNAL_ERROR';
-    let message = 'Internal server error';
-
-    if (error && error.type === 'entity.parse.failed') {
-        status = 400;
-        code = 'INVALID_JSON';
-        message = 'Malformed JSON request body';
-    } else if (error && error.type === 'entity.too.large') {
-        status = 413;
-        code = 'REQUEST_TOO_LARGE';
-        message = 'Request body exceeds the allowed limit';
-    }
-
-    const internalCode = error && typeof error.code === 'string' &&
-        /^[A-Z0-9_]{1,32}$/.test(error.code)
-        ? error.code
-        : 'UNEXPECTED_ERROR';
-
-    console.error('[HTTP_ERROR]', JSON.stringify({
-        method: req.method,
-        status,
-        code,
-        internalCode
-    }));
-
-    return res.status(status).json({
-        success: false,
-        code,
-        message
-    });
-});
+app.use(notFoundHandler);
+app.use(errorHandler);
 
 const PORT = process.env.PORT || 3000;
 
