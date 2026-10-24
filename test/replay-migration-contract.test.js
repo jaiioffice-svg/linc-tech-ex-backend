@@ -49,4 +49,5 @@ test('replay store denies direct client access and restricts RPC execution to se
         migration,
         /grant execute on function public\.linc_consume_auth_assertion\(text, bigint\)\s+to service_role/i
     );
+    assert.match(migration, /notify pgrst, 'reload schema'/i);
 });
