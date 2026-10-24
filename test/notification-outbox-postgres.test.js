@@ -144,7 +144,7 @@ test('termination RPC rejects blank, padded, and oversized user IDs', async () =
 
     try {
         await applyMigrations(database);
-        for (const userId of ['', '   ', ' padded-user ', '\\tpadded-user\\t', '\\npadded-user\\n', 'u'.repeat(201)]) {
+        for (const userId of ['', '   ', ' padded-user ', '\tpadded-user\t', '\npadded-user\n', 'u'.repeat(201)]) {
             await assert.rejects(
                 record(database, userId),
                 error => error && error.code === '22023'
