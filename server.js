@@ -2,7 +2,7 @@ const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
 const { handleUserRegistration, handleHeartbeat, handleImmediateDelete } = require('./controllers');
-const { validateApiKey } = require('./auth');
+const { validateApiKey, requireVerifiedEndUser } = require('./auth');
 const { isDatabaseConfigured, checkDatabaseConnection, classifyDatabaseFailure } = require('./db');
 
 const app = express();
@@ -19,10 +19,12 @@ function sendEmergencySignal(alertPayload) {
     }));
 }
 
-// Preserve the existing heartbeat contract and support explicit profile registration.
-app.post('/api/v1/heartbeat', validateApiKey, handleHeartbeat);
-app.post('/api/v1/users/register', validateApiKey, handleUserRegistration);
-app.post('/api/v1/alert/delete', validateApiKey, (req, res) => handleImmediateDelete(req, res, sendEmergencySignal));
+// These routes intentionally fail closed until an approved, server-verified
+// end-user session contract is wired in before requireVerifiedEndUser.
+// LINC_API_KEY alone is service authentication, not end-user authentication.
+app.post('/api/v1/heartbeat', validateApiKey, requireVerifiedEndUser, handleHeartbeat);
+app.post('/api/v1/users/register', validateApiKey, requireVerifiedEndUser, handleUserRegistration);
+app.post('/api/v1/alert/delete', validateApiKey, requireVerifiedEndUser, (req, res) => handleImmediateDelete(req, res, sendEmergencySignal));
 
 app.get('/health', (req, res) => res.status(200).json({ status: 'operational', timestamp: Date.now() }));
 app.get('/api/health', (req, res) => res.status(200).json({ status: 'operational', timestamp: Date.now() }));
