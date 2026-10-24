@@ -54,9 +54,13 @@ function createAssertion({ scope = '/api/v1/users/register', sub = USER_ID, jti 
 test('authenticated registration API integration with isolated Supabase boundary', async t => {
     const calls = [];
     const terminationCalls = new Map();
+    const unexpectedOutboundRequests = [];
     global.fetch = async (input, options = {}) => {
         const url = new URL(String(input));
-        if (url.origin !== SUPABASE_ORIGIN) return nativeFetch(input, options);
+        if (url.origin !== SUPABASE_ORIGIN) {
+            unexpectedOutboundRequests.push(url.origin);
+            throw new Error('Unexpected external request blocked by integration test boundary');
+        }
 
         calls.push({
             method: options.method || 'GET',
@@ -342,6 +346,7 @@ test('authenticated registration API integration with isolated Supabase boundary
         assert.equal(newCalls[1].path.endsWith('/rpc/linc_record_app_termination'), true);
         assert.deepEqual(newCalls[1].body, { p_user_id: USER_ID });
         assert.equal(newCalls.every(call => call.path.includes('/rpc/linc_')), true);
+        assert.deepEqual(unexpectedOutboundRequests, [], 'the Candidate must not call LINE or another external provider');
     });
 
     await t.test('repeated delete reports already_recorded without trying to dispatch', async () => {
