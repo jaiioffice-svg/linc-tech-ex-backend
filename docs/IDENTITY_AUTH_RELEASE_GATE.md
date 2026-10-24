@@ -106,6 +106,26 @@ The documentation-only review update is on [PR #19](https://github.com/jaiioffic
 - The shared `LINC_API_KEY` is service-to-service authentication, not end-user identity, and must not be embedded in a web/mobile client. The approved client/session contract and whether requests pass through a trusted server-side/BFF layer remain unconfirmed.
 - No live registration/read-back, Supabase CRUD, migrations, LINE delivery, Production requests/settings, secret inspection, merge, or Production promotion were performed. Preview database isolation from Production remains unconfirmed.
 
+## Production startup incident — rechecked 2026-10-24 06:24 UTC
+
+**Current production is not healthy.** Read-only GET requests to the production alias returned:
+- `/health`: HTTP 500, `FUNCTION_INVOCATION_FAILED`, Vercel request ID `sin1::9cd9s-1792823080229-09309f64f76a`.
+- `/ready`: HTTP 500, `FUNCTION_INVOCATION_FAILED`, Vercel request ID `sin1::6fv4d-1792823081490-605771d49d70`.
+
+The affected Production deployment reports READY at the build/deployment level, but targets `main` commit [`336e2fcdd1b9f0841432817dcafe955b45700eef`](https://github.com/jaiioffice-svg/linc-tech-ex-backend/commit/336e2fcdd1b9f0841432817dcafe955b45700eef). A READY deployment is not proof that the function runs correctly.
+
+### Root cause evidence
+- In this exact `main` commit, `server.js` imports `checker.js`, which imports `db.js`.
+- `db.js` performs a top-level `fs.writeFileSync(..., 'linc_data.json')` when the file is missing. The file is not present in the repository's `main` source.
+- This write occurs during module initialization, before Express can answer `/health`. On a read-only serverless deployment filesystem, an `EROFS`/permission exception at this write propagates and prevents startup.
+- I extracted the exact `main` `db.js` source into an isolated scratch directory and fault-injected an `EROFS` failure for that initialization write. Importing the module propagated the exception, confirming that the startup path has no catch for the initial database-file creation. This is a controlled reproduction of the code path, not a claim that I accessed the production filesystem.
+- The same `main` source also has a hard-coded fallback for the shared API key and does not verify end-user identity. Simply removing the startup error would not make this version production-safe; it would still depend on local file writes for data persistence and retain the auth gap.
+
+### Containment decision
+Do **not** make a one-line Production edit, promote the current candidate automatically, or roll back blindly. The reviewed candidate branch is structured to use Supabase instead of creating a local database file on Vercel and fails closed for user-scoped routes until a trusted identity verifier is integrated. However, that candidate has not been promoted, its newest CORS Runtime change is not deployed, and the approved Client/session contract plus Preview/Production database separation remain unconfirmed. Fixing availability must be coordinated with those release gates rather than re-enabling unsafe endpoints.
+
+No Production code, alias, environment variable, secret, database row, migration, or notification setting was changed during this recheck.
+
 ## Release decision
 
 Keep PR #2 in Draft/unmerged state and Issue #22 open. Before release, confirm the approved Client and request/auth contract, implement server-side credential verification with expiry/revocation and principal-derived owner isolation, verify guardian pairing, obtain authorized Preview POST testing, and confirm Preview database isolation before any synthetic CRUD. Passing unit/CI/health checks is not proof that real user authentication or data isolation is complete.
