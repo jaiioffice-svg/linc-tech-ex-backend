@@ -20,6 +20,13 @@ Status: source review of the Library artifact `Linc_Updated_Source_for_Online_Te
 6. **Different backend contract:** the separate repository `jaiioffice-svg/linc-tech-ex-backend` currently exposes `POST /api/v1/heartbeat` and `POST /api/v1/alert/delete` protected by a shared `x-linc-api-key`; those handlers read `userId` from the request body. The archive's bearer-session implementation is not wired into that backend. Do not simply forward client bearer tokens to the shared-key endpoints or expose the shared key in a browser bundle.
 7. **Schema mismatch:** the archive's JSON-file schema and routes differ from the Supabase-backed `linc_users` backend. A migration or route cutover cannot be assumed safe without an explicit identity mapping and data migration plan.
 
+## API origin and deployment contract — verified from this archive only
+
+- `src/services/api.ts` attaches the bearer token but does not define a separate backend base URL. Its inspected call sites use relative paths such as `/api/user/setup`, `/api/heartbeat/ping`, and `/api/line/qr/create`. In a browser these resolve against the page's current origin, so the archive's observed API pattern is same-origin.
+- The archive's `.env.example` sets `APP_URL` to the placeholder `MY_APP_URL` and describes a host URL injected by the hosting platform. This is not a confirmed live client domain and must not be copied into the separate backend's CORS allowlist.
+- Consequently, the archive alone cannot establish that the separate `linc-tech-ex-backend` API is currently called directly from the browser or identify the correct `LINC_ALLOWED_ORIGINS` value. If the intended design keeps the client and its API on one origin, browser CORS configuration may be unnecessary for that client; if a separate Backend is intended, its base URL, server-to-server/BFF path, authentication handoff and real deployed origins must be documented and tested explicitly.
+- Do not add an arbitrary origin to Vercel, and do not regard the restrictive CORS change in the separate backend as proof that the archive is integrated with it. Confirm the approved/deployed client source and hosting topology first.
+
 ## Required next steps before owner-isolation implementation
 
 1. Confirm that this exact archive (or a later named version) is the approved client source and identify its actual deployment/commit.
