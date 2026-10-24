@@ -17,9 +17,14 @@ update public.linc_notification_outbox
            when event_status in ('pending', 'processing', 'retry') then 'blocked'
            else event_status
        end,
-       recipient_line_id = null
+       recipient_line_id = null,
+       sent_at = case
+           when event_status in ('blocked', 'pending', 'processing', 'retry') then null
+           else sent_at
+       end
  where recipient_line_id is not null
-    or event_status in ('pending', 'processing', 'retry');
+    or event_status in ('pending', 'processing', 'retry')
+    or (event_status = 'blocked' and sent_at is not null);
 
 -- Until the future pairing/dispatcher migration, only blocked events and
 -- terminal history states are allowed; all must omit the recipient identifier.
