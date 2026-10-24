@@ -38,6 +38,7 @@ function validateUserRequest(req, res, next) {
         if (
             typeof body.userId !== 'string' ||
             !body.userId.trim() ||
+            body.userId !== body.userId.trim() ||
             body.userId.length > 200
         ) {
             return invalidRequest(
@@ -51,6 +52,8 @@ function validateUserRequest(req, res, next) {
     if (body.grade !== undefined) {
         if (
             typeof body.grade !== 'string' ||
+            !body.grade.trim() ||
+            body.grade !== body.grade.trim() ||
             body.grade.length > 32
         ) {
             return invalidRequest(
