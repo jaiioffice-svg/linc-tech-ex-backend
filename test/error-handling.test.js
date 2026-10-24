@@ -18,6 +18,17 @@ const originalEnv = Object.fromEntries(
     managedEnv.map(key => [key, process.env[key]])
 );
 
+function assertSecurityHeaders(response) {
+    assert.equal(response.headers.get('x-content-type-options'), 'nosniff');
+    assert.equal(response.headers.get('x-frame-options'), 'SAMEORIGIN');
+    assert.equal(response.headers.get('referrer-policy'), 'no-referrer');
+    assert.equal(response.headers.get('x-powered-by'), null);
+    assert.equal(
+        response.headers.get('access-control-allow-origin'),
+        'https://app.example.test'
+    );
+}
+
 test.before(async () => {
     for (const key of managedEnv) delete process.env[key];
 
@@ -44,15 +55,17 @@ test.after(async () => {
     }
 });
 
-test('malformed JSON returns a sanitized 400 response', async () => {
+test('malformed JSON returns a sanitized 400 response with CORS and security headers', async () => {
+    process.env.LINC_ALLOWED_ORIGINS = 'https://app.example.test';
     const response = await fetch(`${baseUrl}/api/v1/heartbeat`, {
         method: 'POST',
-        headers: { 'content-type': 'application/json' },
+        headers: { 'content-type': 'application/json', origin: 'https://app.example.test' },
         body: '{"secret_marker":"malformed'
     });
 
     const body = await response.json();
 
+    assertSecurityHeaders(response);
     assert.equal(response.status, 400);
     assert.deepEqual(body, {
         success: false,
@@ -63,16 +76,18 @@ test('malformed JSON returns a sanitized 400 response', async () => {
     assert.equal(JSON.stringify(body).includes('stack'), false);
 });
 
-test('oversized JSON returns a sanitized 413 response', async () => {
+test('oversized JSON returns a sanitized 413 response with CORS and security headers', async () => {
+    process.env.LINC_ALLOWED_ORIGINS = 'https://app.example.test';
     const marker = 'oversize_marker_'.repeat(6000);
     const response = await fetch(`${baseUrl}/api/v1/heartbeat`, {
         method: 'POST',
-        headers: { 'content-type': 'application/json' },
+        headers: { 'content-type': 'application/json', origin: 'https://app.example.test' },
         body: JSON.stringify({ payload: marker })
     });
 
     const body = await response.json();
 
+    assertSecurityHeaders(response);
     assert.equal(response.status, 413);
     assert.deepEqual(body, {
         success: false,
