@@ -169,7 +169,7 @@ test('returns 401 when a same-length API key is incorrect', () => {
 });
 
 test('end-user route gate rejects noncanonical or oversized principal IDs', () => {
-    for (const userId of [' account-a ', 'a'.repeat(201)]) {
+    for (const userId of [' account-a ', 'a'.repeat(201), 'user' + String.fromCharCode(1) + 'id']) {
         const res = mockResponse();
         let nextCalled = false;
         requireVerifiedEndUser({
