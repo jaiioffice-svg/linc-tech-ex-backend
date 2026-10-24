@@ -266,6 +266,7 @@ test('wrong issuer, audience, missing subject and missing jti are rejected', asy
         run(signAssertion({ aud: 'another-service' })),
         run(signAssertion({ sub: '   ' })),
         run(signAssertion({ sub: ' verified-user-123 ' })),
+        run(signAssertion({ sub: 'user' + String.fromCharCode(1) + 'id' })),
         run(signAssertion({ jti: undefined }))
     ]);
 
