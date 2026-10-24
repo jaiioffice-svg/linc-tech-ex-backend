@@ -17,6 +17,20 @@ The Candidate removes the import-time JSON file write and adds a configured Supa
 - Candidate PR #2 remains **Draft and unmerged**. The code branch has not been validated as a deployed end-to-end release. No Production deployment/configuration or persistent DB was changed.
 - Latest verified runtime/CI commit: `b2610f5306332e2a7a686c556333fe3547e1fcf9`. GitHub Actions runs [#328](https://github.com/jaiioffice-svg/linc-tech-ex-backend/actions/runs/40087654809) and [#329](https://github.com/jaiioffice-svg/linc-tech-ex-backend/actions/runs/40087656936) both passed **81/81 tests, 0 failed**. Both runs also passed `npm audit --audit-level=high` with **0 vulnerabilities** and `node --check` on six runtime JavaScript files. These are CI tests; they do not prove live Supabase, BFF, LINE, or Production integration.
 
+## Percentage reporting correction — one fixed baseline from now on
+
+The earlier conversational estimates of **55%, 40%, and 30% are not comparable or defensible as one continuous progress series** because their scope/weighting was not stated and no common calculation sheet was maintained. Those earlier values should not be interpreted as a measured regression or as proof that 55% of the full product had been completed. They are retracted as a consistent metric; the cause was inadequate reporting discipline, not a verified loss of completed work.
+
+**Authoritative baseline for this project: 29% complete (~30%) / 71% remaining** toward the first safe end-to-end Backend MVP, calculated from the weighted table below. This is a planning estimate with explicit gate weights, not an objective measurement and not the progress of the full L!nc app.
+
+Reporting rules from this checkpoint:
+1. Keep the same six workstreams, weights, scope and calculation for every future update. Do not silently change the denominator.
+2. Update a workstream percentage only when there is new observable evidence that a gate was completed or invalidated; add a dated note with the test, commit, deployment or verified integration result.
+3. A better CI pipeline, passing tests, or additional documents improve engineering confidence but do not automatically add feature-completion percentage unless they close a weighted delivery gate.
+4. Report separate indicators for **Backend MVP completion**, **Production availability**, and **full-product scope confidence**. Never combine them into one number.
+5. Do not claim the full product is 30% complete: the approved Client release and native Android/iOS implementation have not been confirmed. Whole-product percentage remains **not yet reliably measurable**.
+6. Every status update must tell the owner what changed since the last checkpoint, what evidence supports it, which gate is next, and why completion can or cannot increase.
+
 ## Weighted completion model
 
 The weighting is an explicit planning estimate for the **first safe end-to-end Backend MVP**, so large unfinished integration gates are not hidden by a green unit-test run.
