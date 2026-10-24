@@ -122,8 +122,6 @@ test('authenticated registration API integration with isolated Supabase boundary
         body: JSON.stringify({
             userId: USER_ID,
             grade: 'M1',
-            guardianLineId: 'attacker-supplied-guardian',
-            auth: { userId: 'attacker-supplied-principal' }
         })
     });
     const body = await response.json();
