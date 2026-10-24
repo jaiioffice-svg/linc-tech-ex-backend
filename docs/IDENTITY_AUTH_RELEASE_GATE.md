@@ -359,9 +359,9 @@ Project environment metadata was successfully retrieved for the correct Vercel t
 
 No values were decrypted, read, created, or changed. The Supabase URL was not read, so the actual project behind it and Preview-vs-Production DB isolation remain unverified. The Candidate's user-assertion middleware requires `LINC_INTERNAL_AUTH_SECRET` and would fail closed with HTTP 503 until this is configured for an approved Preview and the trusted BFF is wired. Do not add it to Production at this stage.
 
-Fresh GET-only Production probes at 09:22 UTC returned:
-- `GET /health`: HTTP 500 `FUNCTION_INVOCATION_FAILED`, request ID `sin1::vnrtl-1792833730755-752ce94541ad`.
-- `GET /ready`: HTTP 500 `FUNCTION_INVOCATION_FAILED`, request ID `sin1::2jmpn-1792833731860-95b962b160ed`.
+Fresh GET-only Production probes at 09:35 UTC (16:35 Thailand) returned:
+- `GET /health`: HTTP 500 `FUNCTION_INVOCATION_FAILED`, request ID `sin1::w4ckm-1792834501032-aae3fb33e164`.
+- `GET /ready`: HTTP 500 `FUNCTION_INVOCATION_FAILED`, request ID `sin1::nggdm-1792834502180-2e06801f77d4`.
 
 Active Production deployment remains `dpl_2ELeGpWoXTL6wFFvLEXxrLZzRgAk`, from `main` SHA `336e2fcdd1b9f0841432817dcafe955b45700eef`. No Production deployment or setting change, secret read, SQL, persistent database write, Preview SSO bypass, or LINE message occurred.
 
