@@ -403,7 +403,15 @@ test('recordAppTermination rejects malformed RPC results without exposing upstre
     const originalFetch = global.fetch;
 
     global.fetch = async () => new Response(
-        JSON.stringify({ found: true, alreadyRecorded: false, recipient_line_id: 'should-not-leak' }),
+        JSON.stringify({
+            found: true,
+            alreadyRecorded: false,
+            deletedAt: 1792831500000,
+            eventId: '7d2c45b6-1f54-4cbb-9f85-41ac69f6a1d2',
+            eventStatus: 'blocked',
+            guardianLinked: false,
+            recipient_line_id: 'should-not-leak'
+        }),
         { status: 200, headers: { 'content-type': 'application/json' } }
     );
 
@@ -460,6 +468,42 @@ test('saveUser persists a profile using a Supabase upsert', async () => {
             const row = JSON.parse(requestOptions.body);
             assert.equal(row.user_id, 'test-user');
             assert.equal(row.data.userId, 'test-user');
+        });
+    } finally {
+        global.fetch = originalFetch;
+    }
+});
+
+test('recordAppTermination rejects an already-recorded RPC response that claims a pending event', async () => {
+    const db = require('../db');
+    const originalFetch = global.fetch;
+
+    global.fetch = async () => new Response(JSON.stringify({
+        found: true,
+        alreadyRecorded: true,
+        eventId: null,
+        eventStatus: 'pending',
+        guardianLinked: false
+    }), {
+        status: 200,
+        headers: { 'content-type': 'application/json' }
+    });
+
+    try {
+        await withEnv({
+            VERCEL: '1',
+            VERCEL_ENV: 'preview',
+            SUPABASE_URL: 'https://example-project.supabase.co',
+            SUPABASE_SERVICE_ROLE_KEY: 'sb_secret_test_only'
+        }, async () => {
+            await assert.rejects(
+                db.recordAppTermination('delete-user'),
+                error => {
+                    assert.equal(error.code, 'DB_UNAVAILABLE');
+                    assert.equal(error.message, 'App termination RPC returned an unexpected response');
+                    return true;
+                }
+            );
         });
     } finally {
         global.fetch = originalFetch;
