@@ -275,3 +275,17 @@ test('assertion scope must exactly match one allowed POST route', async () => {
         assert.equal(result.nextCalled, false);
     }
 });
+test('unknown assertion claims are rejected before consuming the replay identifier', async () => {
+    let consumeCalled = false;
+    const result = await run(signAssertion({ unexpectedPrivilege: 'admin' }), {
+        consumeAssertionId: async () => {
+            consumeCalled = true;
+            return true;
+        }
+    });
+
+    assert.equal(result.res.statusCode, 401);
+    assert.equal(result.res.body.message, 'Unauthorized connection');
+    assert.equal(result.nextCalled, false);
+    assert.equal(consumeCalled, false);
+});
