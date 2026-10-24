@@ -27,7 +27,7 @@ create or replace function public.linc_consume_auth_assertion(
 returns boolean
 language plpgsql
 security definer
-set search_path = public, pg_temp
+set search_path = pg_catalog, public, pg_temp
 as $$
 declare
     v_now bigint := floor(extract(epoch from clock_timestamp()))::bigint;
