@@ -28,7 +28,7 @@ The current Backend verifier requires a compact JWT with header `{"alg":"HS256",
 |---|---|
 | `iss` | exactly `linc-client-bff` |
 | `aud` | exactly `linc-backend` |
-| `sub` | verified session's non-empty user ID, at most 200 characters |
+| `sub` | verified session's non-empty, already-trimmed user ID, at most 200 characters |
 | `iat` | integer Unix timestamp in seconds; no more than 5 seconds in the future |
 | `exp` | integer Unix timestamp in seconds; must be in the future and no more than 60 seconds after `iat` |
 | `jti` | fresh random identifier, 16–128 URL-safe characters |
@@ -38,7 +38,7 @@ The verifier rejects unsupported JWT header fields and any payload claim outside
 
 ## BFF signing helper (Node.js)
 
-This helper is intended for the **trusted BFF server only**. The caller must pass a user ID obtained from a validated session object; it must not pass `req.body.userId` or any other untrusted value.
+This helper is intended for the **trusted BFF server only**. The caller must pass a canonical, already-trimmed user ID obtained from a validated session object; it must not pass `req.body.userId` or any other untrusted value.
 
 ~~~javascript
 const crypto = require('node:crypto');
@@ -59,6 +59,7 @@ function issueInternalAssertion(verifiedSessionUserId, scope) {
     if (
         typeof verifiedSessionUserId !== 'string' ||
         !verifiedSessionUserId.trim() ||
+        verifiedSessionUserId !== verifiedSessionUserId.trim() ||
         verifiedSessionUserId.length > 200
     ) {
         throw new TypeError('A verified session user ID is required');
