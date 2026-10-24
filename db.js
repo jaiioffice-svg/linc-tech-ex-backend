@@ -227,29 +227,52 @@ async function recordAppTermination(userId) {
             body: JSON.stringify({ p_user_id: userId })
         });
 
+        const allowedResultKeys = new Set([
+            'found',
+            'alreadyRecorded',
+            'deletedAt',
+            'eventId',
+            'eventStatus',
+            'guardianLinked'
+        ]);
         const validBase =
             result &&
             typeof result === 'object' &&
             !Array.isArray(result) &&
+            Object.keys(result).every(key => allowedResultKeys.has(key)) &&
             typeof result.found === 'boolean' &&
             typeof result.alreadyRecorded === 'boolean';
 
-        const validFoundProfile = result.found === false ||
+        const validNotFound =
+            result.found === false &&
+            result.alreadyRecorded === false &&
+            result.eventId === null &&
+            result.eventStatus === null &&
+            result.guardianLinked === false &&
+            (result.deletedAt === undefined || result.deletedAt === null);
+
+        const validAlreadyRecorded =
+            result.found === true &&
+            result.alreadyRecorded === true &&
+            result.guardianLinked === false &&
+            (result.eventId === undefined || result.eventId === null) &&
+            (result.eventStatus === undefined || result.eventStatus === null) &&
             (
-                typeof result.guardianLinked === 'boolean' &&
-                (
-                    result.alreadyRecorded === true ||
-                    (
-                        typeof result.eventId === 'string' &&
-                        /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(result.eventId) &&
-                        result.eventStatus === 'blocked' &&
-                        result.guardianLinked === false &&
-                        Number.isSafeInteger(result.deletedAt)
-                    )
-                )
+                result.deletedAt === undefined ||
+                result.deletedAt === null ||
+                Number.isSafeInteger(result.deletedAt)
             );
 
-        if (!validBase || !validFoundProfile) {
+        const validNewRecord =
+            result.found === true &&
+            result.alreadyRecorded === false &&
+            typeof result.eventId === 'string' &&
+            /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(result.eventId) &&
+            result.eventStatus === 'blocked' &&
+            result.guardianLinked === false &&
+            Number.isSafeInteger(result.deletedAt);
+
+        if (!validBase || !(validNotFound || validAlreadyRecorded || validNewRecord)) {
             const error = new Error('App termination RPC returned an unexpected response');
             error.code = 'DB_UNAVAILABLE';
             throw error;
