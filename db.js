@@ -124,6 +124,26 @@ function isSupabaseUrlAllowed() {
 
 const DATABASE_REQUEST_TIMEOUT_MS = 8000;
 
+function buildSupabaseHeaders(serviceKey, extensionHeaders = {}) {
+    // Only allow non-credential extension headers (for example PostgREST's
+    // Prefer header) from internal callers. Header names are case-insensitive.
+    const extraHeaders = {};
+    for (const [name, value] of Object.entries(extensionHeaders || {})) {
+        if (!['apikey', 'authorization', 'content-type'].includes(name.toLowerCase())) {
+            extraHeaders[name] = value;
+        }
+    }
+
+    return {
+        ...extraHeaders,
+        'Content-Type': 'application/json',
+        apikey: serviceKey,
+        ...(!serviceKey.startsWith('sb_secret_')
+            ? { Authorization: `Bearer ${serviceKey}` }
+            : {})
+    };
+}
+
 async function supabaseRequest(resource, options = {}) {
     assertDatabaseAvailable();
 
@@ -136,29 +156,13 @@ async function supabaseRequest(resource, options = {}) {
     const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
     const requestUrl = `${supabaseBaseUrl()}/rest/v1/${resource}`;
 
-    // Only allow non-credential extension headers (for example PostgREST's
-    // Prefer header) from internal callers. Header names are case-insensitive.
-    const extraHeaders = {};
-    for (const [name, value] of Object.entries(options.headers || {})) {
-        if (!['apikey', 'authorization', 'content-type'].includes(name.toLowerCase())) {
-            extraHeaders[name] = value;
-        }
-    }
-
     const requestOptions = {
         ...options,
         // Do not forward the custom `apikey` header through a cross-origin redirect.
         // A Project URL should answer the REST request directly; any redirect is an error.
         redirect: 'error',
         signal: options.signal || AbortSignal.timeout(DATABASE_REQUEST_TIMEOUT_MS),
-        headers: {
-            ...extraHeaders,
-            'Content-Type': 'application/json',
-            apikey: serviceKey,
-            ...(!serviceKey.startsWith('sb_secret_')
-                ? { Authorization: `Bearer ${serviceKey}` }
-                : {})
-        }
+        headers: buildSupabaseHeaders(serviceKey, options.headers)
     };
 
     let response;
@@ -506,6 +510,7 @@ function calculateWeightedRevenue(grade, studentCount) {
 
 module.exports = {
     hasSupabaseConfig,
+    buildSupabaseHeaders,
     isDatabaseConfigured,
     getUser,
     saveUser,
