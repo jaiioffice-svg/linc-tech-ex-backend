@@ -42,3 +42,29 @@ test('every /api/v1 route enforces service and verified end-user auth in order',
         );
     }
 });
+
+test('every /api/v1 route validates payload shape after verified identity', () => {
+    const routes = app._router.stack
+        .filter(layer => layer.route && typeof layer.route.path === 'string')
+        .map(layer => layer.route)
+        .filter(route => route.path.startsWith('/api/v1/'));
+
+    assert.ok(routes.length > 0, 'expected versioned API routes to be registered');
+
+    for (const route of routes) {
+        const middlewareNames = route.stack.map(layer => layer.name);
+        const label = `${Object.keys(route.methods).join(',').toUpperCase()} ${route.path}`;
+        const endUserAuthIndex = middlewareNames.indexOf('requireVerifiedEndUser');
+        const validationIndex = middlewareNames.indexOf('validateUserRequest');
+
+        assert.notEqual(
+            validationIndex,
+            -1,
+            `${label} must validate its request payload`
+        );
+        assert.ok(
+            endUserAuthIndex < validationIndex,
+            `${label} must verify end-user identity before request validation`
+        );
+    }
+});
