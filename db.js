@@ -12,12 +12,12 @@ function hasSupabaseConfig() {
         typeof projectUrl === 'string' &&
         projectUrl.length > 0 &&
         projectUrl === projectUrl.trim() &&
-        !/[\\u0000-\\u001F\\u007F]/.test(projectUrl);
+        !/[\x00-\x1F\x7F]/.test(projectUrl);
     const hasCanonicalServiceKey =
         typeof serviceKey === 'string' &&
         serviceKey.length > 0 &&
         serviceKey === serviceKey.trim() &&
-        !/[\\u0000-\\u001F\\u007F]/.test(serviceKey);
+        !/[\x00-\x1F\x7F]/.test(serviceKey);
 
     return hasCanonicalProjectUrl && hasCanonicalServiceKey;
 }
