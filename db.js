@@ -202,6 +202,42 @@ async function saveUser(user) {
     return user;
 }
 
+
+async function consumeInternalAssertion(assertionId, expiresAt) {
+    // Replay protection must use durable shared storage, never the local JSON
+    // adapter or an in-memory cache that differs between serverless instances.
+    if (!hasSupabaseConfig()) {
+        const error = new Error('Durable assertion replay storage is not configured');
+        error.code = 'DB_NOT_CONFIGURED';
+        throw error;
+    }
+
+    if (
+        typeof assertionId !== 'string' ||
+        !/^[A-Za-z0-9_-]{16,128}$/.test(assertionId) ||
+        !Number.isSafeInteger(expiresAt)
+    ) {
+        throw new TypeError('A valid assertion replay record is required');
+    }
+
+    const accepted = await supabaseRequest('rpc/linc_consume_auth_assertion', {
+        method: 'POST',
+        headers: { Prefer: 'return=representation' },
+        body: JSON.stringify({
+            p_jti: assertionId,
+            p_expires_at: expiresAt
+        })
+    });
+
+    if (typeof accepted !== 'boolean') {
+        const error = new Error('Assertion replay storage returned an unexpected response');
+        error.code = 'DB_UNAVAILABLE';
+        throw error;
+    }
+
+    return accepted;
+}
+
 function classifyDatabaseFailure(error) {
     const code = error && error.upstreamCode;
     if (code === 'PGRST125') return 'invalid_rest_url';
@@ -240,6 +276,7 @@ module.exports = {
     getUser,
     saveUser,
     checkDatabaseConnection,
+    consumeInternalAssertion,
     classifyDatabaseFailure,
     calculateWeightedRevenue
 };
