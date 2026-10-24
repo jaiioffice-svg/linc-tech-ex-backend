@@ -87,3 +87,32 @@ test('heartbeat never trusts a guardian LINE ID supplied for a newly created pro
     assert.equal(res.statusCode, 201);
     assert.equal(readState().users['heartbeat-user'].guardianLineId, null);
 });
+
+test('immediate-delete alert uses the stored guardian ID, not a request-body value', async () => {
+    fs.writeFileSync(process.env.LINC_DATA_FILE, JSON.stringify({
+        schools: {},
+        users: {
+            'delete-user': {
+                userId: 'delete-user',
+                grade: 'M1',
+                guardianLineId: 'verified-stored-line-id',
+                createdAt: Date.now(),
+                status: 'active'
+            }
+        },
+        revenue: { total: 0 }
+    }));
+
+    const res = mockResponse();
+    let alertPayload;
+    await require('../controllers').handleImmediateDelete({
+        body: {
+            userId: 'delete-user',
+            guardianLineId: 'attacker-controlled-line-id'
+        }
+    }, res, payload => { alertPayload = payload; });
+
+    assert.equal(res.statusCode, 200);
+    assert.equal(alertPayload.guardianLineId, 'verified-stored-line-id');
+    assert.equal(readState().users['delete-user'].status, 'app_deleted');
+});
