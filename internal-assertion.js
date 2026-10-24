@@ -53,7 +53,7 @@ function createInternalAssertionMiddleware({ consumeAssertionId = consumeInterna
         typeof secret !== 'string' ||
         Buffer.byteLength(secret, 'utf8') < 32 ||
         secret !== secret.trim() ||
-        /[\\x00-\\x1F\\x7F]/.test(secret)
+        /[\x00-\x1F\x7F]/.test(secret)
     ) {
         return res.status(503).json({
             success: false,
