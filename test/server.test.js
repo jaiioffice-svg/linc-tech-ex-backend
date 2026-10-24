@@ -315,7 +315,7 @@ test('protected route enforces signed BFF assertions, route scope, and verified 
         assert.equal(validIdentityMissingDatabase.status, 503);
         assert.equal(
             (await validIdentityMissingDatabase.json()).message,
-            'Required database service is not configured or is temporarily unavailable'
+            'Identity verification service is temporarily unavailable'
         );
     });
 });
