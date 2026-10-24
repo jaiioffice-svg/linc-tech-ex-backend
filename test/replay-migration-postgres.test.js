@@ -89,3 +89,49 @@ test('replay migration executes in embedded PostgreSQL and enforces one-time use
         await database.close();
     }
 });
+
+test('replay RPC rejects malformed IDs and invalid expiry boundaries', async () => {
+    const database = new PGlite();
+
+    try {
+        await database.exec(
+            'CREATE ROLE anon; CREATE ROLE authenticated; CREATE ROLE service_role;'
+        );
+        const migrationPath = path.join(
+            __dirname,
+            '..',
+            'supabase',
+            'migrations',
+            '20261024_003_auth_assertion_replay.sql'
+        );
+        await database.exec(fs.readFileSync(migrationPath, 'utf8'));
+
+        const now = Math.floor(Date.now() / 1000);
+        const invalidCases = [
+            [null, now + 30],
+            ['too-short', now + 30],
+            ['contains whitespace', now + 30],
+            ['x'.repeat(129), now + 30],
+            ['valid-jti-but-null-exp', null],
+            ['expired-jti-test-0001', now - 60],
+            ['too-far-future-jti-0001', now + 120]
+        ];
+
+        for (const [jti, expiresAt] of invalidCases) {
+            await assert.rejects(
+                database.query(
+                    'SELECT public.linc_consume_auth_assertion($1, $2)',
+                    [jti, expiresAt]
+                ),
+                error => error && error.code === '22023'
+            );
+        }
+
+        const rows = await database.query(
+            'SELECT count(*)::int AS count FROM public.linc_auth_assertion_replays'
+        );
+        assert.equal(rows.rows[0].count, 0, 'invalid assertion records must not be stored');
+    } finally {
+        await database.close();
+    }
+});
