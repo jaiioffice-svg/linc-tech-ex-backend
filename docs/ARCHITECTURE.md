@@ -125,3 +125,14 @@ This target structure is a roadmap, not a claim that those modules currently exi
 - GitHub Actions run #139 passed for that commit: https://github.com/jaiioffice-svg/linc-tech-ex-backend/actions/runs/40074894635.
 - Production remained HTTP 500 on both /health and /ready on the latest real read-only check recorded in docs/IDENTITY_AUTH_RELEASE_GATE.md. Candidate code/tests are not a Production repair or proof of real database/auth integration.
 - No SQL migration, database CRUD, secret decryption, Production environment changes, Production deployment, PR merge, or real notification was performed.
+
+## 11. API error-boundary hardening (2026-10-24)
+
+The current Candidate's Express app now has a stable not-found handler and a final error middleware:
+- Malformed JSON returns HTTP 400 with code `INVALID_JSON`.
+- JSON body over the 64 KiB parser limit returns HTTP 413 with code `REQUEST_TOO_LARGE`.
+- Unknown routes return HTTP 404 with code `ROUTE_NOT_FOUND`.
+- Unexpected errors return a generic HTTP 500 `INTERNAL_ERROR`; logs contain only request method, status, normalized response code, and a validated internal error code. They do not log raw request bodies, exception messages, bearer tokens, or credentials.
+- The response does not contain a stack trace or echo attacker-supplied payload.
+
+The new `test/error-handling.test.js` covers malformed JSON, an oversized request body and an unknown route. On Candidate commit `b1938566584f7ad42e732cb7d6916937ec980bda`, isolated Sandbox checks passed **41/41 tests**, `npm audit` reported 0 vulnerabilities, and GitHub Actions [run #149](https://github.com/jaiioffice-svg/linc-tech-ex-backend/actions/runs/40076554069) succeeded. This is test/CI evidence only; it does not implement user-session verification or repair the deployed Production function.
