@@ -96,6 +96,86 @@ test('getUser reads a profile from Supabase REST', async () => {
     }
 });
 
+test('Supabase REST request has an abort timeout and normalizes transport failures', async () => {
+    const db = require('../db');
+    const originalFetch = global.fetch;
+    let requestOptions;
+
+    global.fetch = async (_url, options) => {
+        requestOptions = options;
+        const error = new Error('private transport diagnostic');
+        error.name = 'AbortError';
+        throw error;
+    };
+
+    try {
+        await withEnv({
+            VERCEL: '1',
+            VERCEL_ENV: 'preview',
+            SUPABASE_URL: 'https://example-project.supabase.co',
+            SUPABASE_SERVICE_ROLE_KEY: 'sb_secret_test_only'
+        }, async () => {
+            await assert.rejects(
+                db.getUser('timeout-user'),
+                error => {
+                    assert.equal(error.code, 'DB_UNAVAILABLE');
+                    assert.equal(
+                        error.message,
+                        'Database service is temporarily unavailable'
+                    );
+                    assert.equal(
+                        error.message.includes('private transport diagnostic'),
+                        false
+                    );
+                    return true;
+                }
+            );
+
+            assert.ok(requestOptions.signal instanceof AbortSignal);
+            assert.equal(requestOptions.signal.aborted, false);
+        });
+    } finally {
+        global.fetch = originalFetch;
+    }
+});
+
+test('invalid successful response JSON is normalized as a database-unavailable error', async () => {
+    const db = require('../db');
+    const originalFetch = global.fetch;
+
+    global.fetch = async () => new Response(
+        'private upstream response body',
+        { status: 200, headers: { 'content-type': 'application/json' } }
+    );
+
+    try {
+        await withEnv({
+            VERCEL: '1',
+            VERCEL_ENV: 'preview',
+            SUPABASE_URL: 'https://example-project.supabase.co',
+            SUPABASE_SERVICE_ROLE_KEY: 'sb_secret_test_only'
+        }, async () => {
+            await assert.rejects(
+                db.getUser('invalid-json-user'),
+                error => {
+                    assert.equal(error.code, 'DB_UNAVAILABLE');
+                    assert.equal(
+                        error.message,
+                        'Database response is temporarily unavailable'
+                    );
+                    assert.equal(
+                        error.message.includes('private upstream response body'),
+                        false
+                    );
+                    return true;
+                }
+            );
+        });
+    } finally {
+        global.fetch = originalFetch;
+    }
+});
+
 test('saveUser persists a profile using a Supabase upsert', async () => {
     const db = require('../db');
     const originalFetch = global.fetch;
