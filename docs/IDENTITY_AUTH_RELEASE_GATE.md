@@ -22,6 +22,7 @@ The separate documentation review `docs/CLIENT-SESSION-CONTRACT-REVIEW-20261024.
 For that archive only, the review found:
 - Client reads `linc_session_token` from browser `localStorage` and sends it as `Authorization: Bearer <token>`.
 - The inspected archive's `src/services/api.ts` uses relative URLs such as `/api/user/setup` and `/api/heartbeat/ping`; it does not define a separate base URL for this GitHub backend. Its `.env.example` has `APP_URL="MY_APP_URL"`, a placeholder, not a verified deployed client domain.
+- A scan of the inspected archive's TypeScript/TSX/JavaScript/JSX files found **zero** `/api/v1/` references and **18** `apiFetch` call sites for relative `/api/...` routes. The inspected archive therefore does not demonstrate integration with this backend's `/api/v1/users/register`, `/api/v1/heartbeat`, or `/api/v1/alert/delete` contract.
 - Server creates a random opaque token, stores its SHA-256 hash in a JSON-file `db.sessions` store, and gives it a 30-day expiry.
 - The archive's `getSessionUserId` validates the stored hash and expiry; `requireOwner` compares the resolved session user against the requested profile ID.
 - The separate GitHub backend in this repository does not implement that same session contract. Its original protected routes used a shared `x-linc-api-key` and request-body `userId`.
