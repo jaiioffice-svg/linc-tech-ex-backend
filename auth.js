@@ -21,4 +21,28 @@ function validateApiKey(req, res, next) {
     next();
 }
 
-module.exports = { validateApiKey };
+// This middleware deliberately fails closed until a reviewed end-user session
+// verifier sets req.auth.userId. A shared service API key is not user identity.
+// Only trusted server middleware may populate req.auth; never derive it from req.body.
+function requireVerifiedEndUser(req, res, next) {
+    const authenticatedUserId = req.auth && req.auth.userId;
+
+    if (typeof authenticatedUserId !== 'string' || !authenticatedUserId.trim()) {
+        return res.status(503).json({
+            success: false,
+            message: 'End-user identity verification is not configured'
+        });
+    }
+
+    const requestedUserId = req.body && req.body.userId;
+    if (requestedUserId !== undefined && requestedUserId !== authenticatedUserId) {
+        return res.status(403).json({
+            success: false,
+            message: 'Requested user does not match authenticated identity'
+        });
+    }
+
+    next();
+}
+
+module.exports = { validateApiKey, requireVerifiedEndUser };
