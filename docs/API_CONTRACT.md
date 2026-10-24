@@ -41,7 +41,7 @@ This route currently records the termination state and outbox event. It does **n
 - `notificationStatus: "already_recorded"` means the profile is already terminal and no duplicate event should be emitted.
 - A legacy LINE identifier is not proof of provider-verified pairing or consent.
 - The current Candidate database schema allows outbox states `blocked`, `sent`, and `dead` only, and all rows must have `recipient_line_id = NULL`. `pending`, `processing`, and `retry` are rejected by a database constraint until provider-verified guardian pairing and a reviewed delivery worker are implemented.
-- Migration `20261024_006_disable_unverified_outbox_dispatch.sql` blocks undelivered legacy events, clears stored recipient IDs from outbox rows, and removes `sent_at` from blocked/undelivered events. Terminal `sent`/`dead` labels are retained only as historical state and do not prove this Candidate actually sent LINE messages.
+- Migration `20261024_005_outbox_fail_closed_default.sql` blocks undelivered legacy events, clears recipient IDs and stale `sent_at` values from blocked events, and installs the strict constraint before any later repair migration. Migration 006 repeats the fail-closed normalization idempotently for databases that may have received an older 005. Terminal `sent`/`dead` labels are retained only as historical state and do not prove this Candidate actually sent LINE messages.
 - The durable Supabase outbox is only available after the appropriate migrations are applied to the confirmed, isolated non-production database. The migrations in this branch have not been applied to a persistent database, and no LINE dispatcher is wired.
 
 Never tell the user or guardian that a message was sent merely because the API returned success.
