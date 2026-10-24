@@ -5,7 +5,7 @@ const app = require('../server');
 // Treat every versioned API endpoint as private by default. If a future
 // endpoint is intentionally public, it must be explicitly reviewed rather
 // than silently bypassing the end-user identity gate.
-test('every /api/v1 route enforces service and verified end-user auth in order', () => {
+test('every non-health API route enforces service, assertion and verified-user auth in order', () => {
     const mountedRouters = app._router.stack.filter(
         layer => layer.name === 'router' &&
             layer.handle &&
@@ -24,7 +24,7 @@ test('every /api/v1 route enforces service and verified end-user auth in order',
     const routes = app._router.stack
         .filter(layer => layer.route && typeof layer.route.path === 'string')
         .map(layer => layer.route)
-        .filter(route => route.path.startsWith('/api/v1/'));
+        .filter(route => route.path.startsWith('/api/') && !['/api/health', '/api/ready'].includes(route.path));
 
     assert.ok(routes.length > 0, 'expected versioned API routes to be registered');
 
@@ -46,11 +46,11 @@ test('every /api/v1 route enforces service and verified end-user auth in order',
     }
 });
 
-test('every /api/v1 route validates payload shape after verified identity', () => {
+test('every non-health API route validates payload shape after verified identity', () => {
     const routes = app._router.stack
         .filter(layer => layer.route && typeof layer.route.path === 'string')
         .map(layer => layer.route)
-        .filter(route => route.path.startsWith('/api/v1/'));
+        .filter(route => route.path.startsWith('/api/') && !['/api/health', '/api/ready'].includes(route.path));
 
     assert.ok(routes.length > 0, 'expected versioned API routes to be registered');
 
