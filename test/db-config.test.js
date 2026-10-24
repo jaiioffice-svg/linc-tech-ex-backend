@@ -104,8 +104,8 @@ test('getUser strictly encodes punctuation in untrusted PostgREST filter values'
     try {
         const { getUser } = require('../db');
         await getUser("attacker')or(status.eq.active");
-        assert.match(requestedUrl, /user_id=eq\\.attacker%27%29or%28status\\.eq\\.active/);
-        assert.doesNotMatch(requestedUrl, /user_id=eq\\.attacker'\\)or\\(/);
+        assert.ok(requestedUrl.includes("%27%29or%28status.eq.active"), 'apostrophes and parentheses must be percent-encoded');
+        assert.equal(requestedUrl.includes("attacker')or("), false, 'raw injection-like punctuation must not appear in the URL');
     } finally {
         global.fetch = previousFetch;
         for (const [key, value] of Object.entries(previousEnv)) {
