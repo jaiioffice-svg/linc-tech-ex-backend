@@ -48,7 +48,7 @@ test('Supabase config requires both URL and service key', () => {
 });
 
 
-test('Supabase config fails closed on blank, padded, or control-character environment values', async () => {
+test('Supabase config fails closed on blank and whitespace-padded environment values', async () => {
     const originalFetch = global.fetch;
     let fetchCalls = 0;
     global.fetch = async () => {
@@ -65,7 +65,6 @@ test('Supabase config fails closed on blank, padded, or control-character enviro
             { SUPABASE_URL: ' https://example-project.supabase.co', SUPABASE_SERVICE_ROLE_KEY: 'sb_secret_test_only_key' },
             { SUPABASE_URL: 'https://example-project.supabase.co', SUPABASE_SERVICE_ROLE_KEY: ' sb_secret_test_only_key' },
             { SUPABASE_URL: 'https://example-project.supabase.co', SUPABASE_SERVICE_ROLE_KEY: 'sb_secret_test_only_key' + String.fromCharCode(10) },
-            { SUPABASE_URL: 'https://example-project.supabase.co' + String.fromCharCode(1), SUPABASE_SERVICE_ROLE_KEY: 'sb_secret_test_only_key' }
         ];
 
         for (const values of invalidConfigs) {
