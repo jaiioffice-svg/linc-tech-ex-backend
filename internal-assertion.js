@@ -6,6 +6,7 @@ const EXPECTED_ISSUER = 'linc-client-bff';
 const EXPECTED_AUDIENCE = 'linc-backend';
 const MAX_ASSERTION_BYTES = 4096;
 const MAX_ASSERTION_TTL_SECONDS = 60;
+const ALLOWED_CLAIMS = new Set(['iss', 'aud', 'sub', 'iat', 'exp', 'jti', 'scope', 'nbf']);
 const ALLOWED_SCOPES = new Set([
     '/api/v1/heartbeat',
     '/api/v1/users/register',
@@ -110,6 +111,7 @@ function createInternalAssertionMiddleware({ consumeAssertionId = consumeInterna
             !claims ||
             typeof claims !== 'object' ||
             Array.isArray(claims) ||
+            Object.keys(claims).some(key => !ALLOWED_CLAIMS.has(key)) ||
             claims.iss !== EXPECTED_ISSUER ||
             claims.aud !== EXPECTED_AUDIENCE ||
             typeof claims.sub !== 'string' ||
