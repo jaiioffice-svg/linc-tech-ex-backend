@@ -83,7 +83,8 @@ function supabaseBaseUrl() {
         hostname.length > '.supabase.co'.length;
     const loopbackHost = ['localhost', '127.0.0.1', '::1', '[::1]'].includes(hostname);
     const allowedHttpsHost = parsed.protocol === 'https:' &&
-        (!runningOnVercel || standardSupabaseHost);
+        standardSupabaseHost &&
+        parsed.port === '';
     const allowedLocalHttp = !runningOnVercel &&
         parsed.protocol === 'http:' &&
         loopbackHost;
@@ -123,6 +124,9 @@ async function supabaseRequest(resource, options = {}) {
     const requestUrl = `${supabaseBaseUrl()}/rest/v1/${resource}`;
     const requestOptions = {
         ...options,
+        // Do not forward the custom `apikey` header through a cross-origin redirect.
+        // A Project URL should answer the REST request directly; any redirect is an error.
+        redirect: 'error',
         signal: options.signal || AbortSignal.timeout(DATABASE_REQUEST_TIMEOUT_MS),
         headers: {
             apikey: serviceKey,
