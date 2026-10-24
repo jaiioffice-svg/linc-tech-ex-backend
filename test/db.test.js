@@ -21,11 +21,11 @@ async function withEnv(values, callback) {
     }
 }
 
-test('module can load on Vercel without writing to the deployment filesystem', () => {
+test('module can load on Vercel without writing to the deployment filesystem', async () => {
     const originalWriteFileSync = fs.writeFileSync;
     delete require.cache[dbPath];
     try {
-        withEnv({
+        await withEnv({
             VERCEL: '1',
             VERCEL_ENV: 'preview',
             SUPABASE_URL: undefined,
