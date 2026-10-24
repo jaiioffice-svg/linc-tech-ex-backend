@@ -1,11 +1,62 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
+const crypto = require('node:crypto');
 const app = require('../server');
 
 let server;
 let baseUrl;
 const envKeys = ['LINC_API_KEY', 'LINC_INTERNAL_AUTH_SECRET', 'SUPABASE_URL', 'SUPABASE_SERVICE_ROLE_KEY', 'VERCEL', 'VERCEL_ENV'];
 const originalEnv = Object.fromEntries(envKeys.map(key => [key, process.env[key]]));
+
+async function withTestEnv(values, callback) {
+    const previous = Object.fromEntries(
+        Object.keys(values).map(key => [key, process.env[key]])
+    );
+
+    for (const [key, value] of Object.entries(values)) {
+        if (value === undefined) delete process.env[key];
+        else process.env[key] = value;
+    }
+
+    try {
+        return await callback();
+    } finally {
+        for (const [key, value] of Object.entries(previous)) {
+            if (value === undefined) delete process.env[key];
+            else process.env[key] = value;
+        }
+    }
+}
+
+function makeInternalAssertion({
+    userId = 'verified-user-123',
+    scope = '/api/v1/heartbeat',
+    secret = 'test-only-internal-auth-secret-1234567890',
+    issuedAt = Math.floor(Date.now() / 1000),
+    expiresAt = issuedAt + 30,
+    assertionId = 'integration-test-assertion-01'
+} = {}) {
+    const header = Buffer.from(JSON.stringify({
+        alg: 'HS256',
+        typ: 'JWT'
+    })).toString('base64url');
+    const payload = Buffer.from(JSON.stringify({
+        iss: 'linc-client-bff',
+        aud: 'linc-backend',
+        sub: userId,
+        iat: issuedAt,
+        exp: expiresAt,
+        jti: assertionId,
+        scope
+    })).toString('base64url');
+    const signingInput = `${header}.${payload}`;
+    const signature = crypto
+        .createHmac('sha256', secret)
+        .update(signingInput)
+        .digest('base64url');
+
+    return `${signingInput}.${signature}`;
+}
 
 test.before(async () => {
     // Keep this test independent of deployment secrets and use no real database.
@@ -192,4 +243,79 @@ test('registration cannot spoof req.auth by nesting an auth object in JSON body'
     assert.equal(response.status, 503);
     assert.equal(body.message, 'End-user identity verification is not configured');
     delete process.env.LINC_API_KEY;
+});
+
+test('protected route enforces signed BFF assertions, route scope, and verified identity before database access', async () => {
+    const serviceKey = 'test-only-service-key';
+    const secret = 'test-only-internal-auth-secret-1234567890';
+    const validAssertion = makeInternalAssertion({ secret });
+
+    await withTestEnv({
+        LINC_API_KEY: serviceKey,
+        LINC_INTERNAL_AUTH_SECRET: secret,
+        SUPABASE_URL: undefined,
+        SUPABASE_SERVICE_ROLE_KEY: undefined,
+        VERCEL: '1',
+        VERCEL_ENV: 'preview'
+    }, async () => {
+        const noAssertion = await fetch(`${baseUrl}/api/v1/heartbeat`, {
+            method: 'POST',
+            headers: {
+                'content-type': 'application/json',
+                'x-linc-api-key': serviceKey
+            },
+            body: JSON.stringify({ userId: 'verified-user-123', grade: 'M1' })
+        });
+
+        assert.equal(noAssertion.status, 401);
+        assert.equal((await noAssertion.json()).message, 'Unauthorized connection');
+
+        const wrongScope = await fetch(`${baseUrl}/api/v1/heartbeat`, {
+            method: 'POST',
+            headers: {
+                'content-type': 'application/json',
+                'x-linc-api-key': serviceKey,
+                'x-linc-user-assertion': makeInternalAssertion({
+                    secret,
+                    scope: '/api/v1/users/register'
+                })
+            },
+            body: JSON.stringify({ userId: 'verified-user-123', grade: 'M1' })
+        });
+
+        assert.equal(wrongScope.status, 401);
+        assert.equal((await wrongScope.json()).message, 'Unauthorized connection');
+
+        const bodySpoof = await fetch(`${baseUrl}/api/v1/heartbeat`, {
+            method: 'POST',
+            headers: {
+                'content-type': 'application/json',
+                'x-linc-api-key': serviceKey,
+                'x-linc-user-assertion': validAssertion
+            },
+            body: JSON.stringify({ userId: 'attacker-selected-user', grade: 'M1' })
+        });
+
+        assert.equal(bodySpoof.status, 403);
+        assert.equal(
+            (await bodySpoof.json()).message,
+            'Requested user does not match authenticated identity'
+        );
+
+        const validIdentityMissingDatabase = await fetch(`${baseUrl}/api/v1/heartbeat`, {
+            method: 'POST',
+            headers: {
+                'content-type': 'application/json',
+                'x-linc-api-key': serviceKey,
+                'x-linc-user-assertion': validAssertion
+            },
+            body: JSON.stringify({ userId: 'verified-user-123', grade: 'M1' })
+        });
+
+        assert.equal(validIdentityMissingDatabase.status, 503);
+        assert.equal(
+            (await validIdentityMissingDatabase.json()).message,
+            'Required database service is not configured or is temporarily unavailable'
+        );
+    });
 });
