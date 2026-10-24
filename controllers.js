@@ -109,20 +109,30 @@ exports.handleImmediateDelete = async (req, res, triggerAlertCallback) => {
             return res.status(404).json({ success: false, message: 'Target profile not found' });
         }
 
-        targetUser.status = 'app_deleted';
-        targetUser.deletedAt = Date.now();
-        await saveUser(targetUser);
+        const alreadyRecorded = targetUser.status === 'app_deleted';
 
-        // This callback currently records an alert event only; actual LINE delivery must be integrated separately.
-        if (typeof triggerAlertCallback === 'function') {
-            triggerAlertCallback({
-                userId,
-                guardianLineId: targetUser.guardianLineId || null,
-                reason: 'APP_TERMINATION_SIGNAL'
-            });
+        if (!alreadyRecorded) {
+            targetUser.status = 'app_deleted';
+            targetUser.deletedAt = Date.now();
+            await saveUser(targetUser);
+
+            // The current callback records a pending event; real delivery needs an outbox.
+            if (typeof triggerAlertCallback === 'function') {
+                triggerAlertCallback({
+                    userId,
+                    guardianLineId: targetUser.guardianLineId || null,
+                    reason: 'APP_TERMINATION_SIGNAL'
+                });
+            }
         }
 
-        return res.status(200).json({ success: true, message: 'Termination event recorded' });
+        return res.status(200).json({
+            success: true,
+            alreadyRecorded,
+            message: alreadyRecorded
+                ? 'Termination event already recorded'
+                : 'Termination event recorded'
+        });
     } catch (error) {
         return sendError(res, error, 'IMMEDIATE_DELETE');
     }
