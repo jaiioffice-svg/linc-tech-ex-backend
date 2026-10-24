@@ -10,8 +10,8 @@ const executableSql = sql
     .replace(/\/\*[\s\S]*?\*\//g, '');
 
 test('Supabase preflight explicitly tells operators to stop if the table is absent', () => {
-    assert.match(sql, /if it returns zero rows, STOP here/i);
-    assert.match(sql, /sections 2-9 require the table to exist/i);
+    assert.match(sql, /If section 1 returns zero rows, STOP/i);
+    assert.match(sql, /If section 1 confirms the table exists/i);
 });
 
 test('Supabase preflight warns operators not to execute all sections on an unknown schema', () => {
