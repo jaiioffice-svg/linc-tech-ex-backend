@@ -121,3 +121,33 @@ Build a worker with retry/idempotency, recipient re-check before send, safe logs
 - No Production variables or secret values were read/changed in this checkpoint.
 - No SQL was run against Supabase; no persistent DB writes, migration application, SSO bypass, or LINE message occurred.
 - Do not call the product ready based on CI success alone.
+
+
+## Checkpoint — 2026-10-25 (read-only verification)
+
+**Verified at:** 2026-10-25 19:39 Asia/Bangkok. This checkpoint records a new Candidate test result and a fresh Production health observation; it does not close a live integration/release gate.
+
+### Current Candidate and exact-SHA CI
+
+- PR #2 remains **open, Draft, and unmerged**. Current HEAD: [`1eb5ad10daf3d386c6693f3f528a14580c8993a0`](https://github.com/jaiioffice-svg/linc-tech-ex-backend/commit/1eb5ad10daf3d386c6693f3f528a14580c8993a0).
+- GitHub Actions [run #597](https://github.com/jaiioffice-svg/linc-tech-ex-backend/actions/runs/40101588663) completed successfully on that exact SHA. Job logs confirm `npm ci`, `npm audit --audit-level=high` (0 vulnerabilities), six `node --check` checks, and **124 tests passed / 0 failed**.
+- The only file in that HEAD commit is `test/replay-migration-postgres.test.js`. The added concurrency regression test runs 12 simultaneous consumes for one JTI in embedded PGlite/PostgreSQL and asserts exactly one accepted request, 11 rejections, and one stored replay row.
+- This is stronger **embedded database regression evidence**, not live Supabase/RPC proof. No persistent database migration or write was performed.
+
+### Fresh Production GET checks
+
+The current Production alias was checked with read-only GET requests on 2026-10-25:
+
+- `GET /health`: **HTTP 500**, `FUNCTION_INVOCATION_FAILED`, at 12:39:25 UTC (19:39:25 Thailand); Vercel request ID `iad1:iad1::4wggr-1792931964618-29eac536b8a1`.
+- `GET /ready`: **HTTP 500**, `FUNCTION_INVOCATION_FAILED`, at 12:39:28 UTC (19:39:28 Thailand); Vercel request ID `iad1:iad1::g6r64-1792931968534-b50493bbe088`.
+- The latest Production deployment remains `dpl_GDRLT35mJP9GVARVh6cMyKRoXnYB`, `main` SHA `758960a4e06cb79f3c243913859243fc9bdd9a67`, Vercel state `READY`. READY is not route-health proof.
+- Vercel's current 24-hour runtime-error aggregation returned no clusters, and runtime-log queries for these two fresh request IDs returned no records. Therefore this checkpoint reconfirms the **HTTP 500 symptom**, but does not independently reproduce a detailed stack trace today. The last detailed root-cause evidence remains the prior request-correlated `EROFS: read-only file system, open '/var/task/linc_data.json'` at `/var/task/db.js:6:8` (2026-10-24).
+
+### Weighted estimate and blocker
+
+- **Backend MVP: 29% complete / 71% remaining.** The fixed six-workstream denominator and weighted contributions above are unchanged.
+- No percentage increase is justified: the new concurrent replay test runs in embedded PGlite, while the hosted Supabase, trusted Client/BFF session bridge, verified guardian pairing/LINE dispatcher, and end-to-end Preview acceptance gates remain open.
+- **Immediate Production blocker:** `/health` and `/ready` still return HTTP 500; the last detailed stack points to an import-time JSON write on Vercel's read-only filesystem.
+- **Next Candidate release blocker:** confirm the approved Client source and authoritative session store, then wire a server-side BFF that validates the real session and mints the signed Backend assertion. Do not weaken the fail-closed identity guard. Prove Preview Supabase isolation before any persistent migration or live CRUD test.
+
+No merge, deploy, rollback, Production configuration/secret change, migration, persistent database write, Preview SSO bypass, or LINE send was performed in this checkpoint.
