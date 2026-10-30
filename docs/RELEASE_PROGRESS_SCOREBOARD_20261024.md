@@ -1,6 +1,6 @@
 # L!nc Backend — release progress scoreboard
 
-**As of: 2026-10-24 21:26 Asia/Bangkok**  
+**Baseline established: 2026-10-24 21:26 Asia/Bangkok**  
 **Scope:** first safely usable end-to-end Backend MVP, not the complete product UI. The approved/deployed Client source is not currently confirmed, so this is a conservative engineering estimate, not a claim that the whole L!nc app is this complete.
 
 ## Executive status
@@ -50,7 +50,7 @@ The weighting is an explicit planning estimate for the **first safe end-to-end B
 | Workstream | Weight | Estimated completion | Contribution | Evidence / blocker |
 |---|---:|---:|---:|---|
 | Backend route/controller foundation, validation, ownership guards, outbox logic | 25% | 65% | 16.25% | Candidate code and regression coverage exist; verified session middleware is intentionally fail-closed until a trusted BFF is connected. |
-| Repeatable dependency install, audit and automated CI | 10% | 100% | 10% | Latest Candidate code/test SHA `e3c718b`: run #589 passed 121 tests with zero failures, `npm audit --audit-level=high` found 0 vulnerabilities, locked install passed, and six runtime syntax checks passed. Tests cover canonical IDs, allowed profile statuses before I/O, Supabase URL/environment validation, no-redirect credentials, strict `Prefer` header allowlisting, canonical secrets, JSON primitive validation, registration/delete HTTP flows, external-call blocking, and seven-migration PGlite outbox upgrade. Actions are pinned to full SHAs; this is not live Supabase integration proof. |
+| Repeatable dependency install, audit and automated CI | 10% | 100% | 10% | Latest code/test SHA `1eb5ad10daf3d386c6693f3f528a14580c8993a0`: run #597 passed 124 tests with zero failures; exact current PR HEAD `2dc989f704031f445f57055a6cd364e26c4f0469` is a documentation-only child and run #598 also passed 124 tests. `npm ci`, `npm audit --audit-level=high` (0 vulnerabilities), and six runtime syntax checks passed. Includes embedded PGlite concurrency/migration tests; not live Supabase integration proof. |
 | Hosted Supabase migration/RLS/RPC and real CRUD verification in an isolated non-production project | 20% | 10% | 2% | Core/replay/outbox migrations and PGlite tests exist; no migration was applied to a persistent database and actual Preview project isolation is unconfirmed. |
 | Approved Client session → trusted BFF → signed Backend assertion | 20% | 0% | 0% | Contract documentation exists, but no approved Client/BFF repo/session source or verified deployed commit has been identified in the connected GitHub/Vercel inventory. |
 | Provider-verified guardian pairing, explicit consent, Official Account friend state and real LINE dispatcher | 15% | 5% | 0.75% | Design contract now documented; no pairing implementation, dispatcher, or live LINE delivery exists. Legacy recipient IDs are blocked. |
@@ -151,3 +151,32 @@ The current Production alias was checked with read-only GET requests on 2026-10-
 - **Next Candidate release blocker:** confirm the approved Client source and authoritative session store, then wire a server-side BFF that validates the real session and mints the signed Backend assertion. Do not weaken the fail-closed identity guard. Prove Preview Supabase isolation before any persistent migration or live CRUD test.
 
 No merge, deploy, rollback, Production configuration/secret change, migration, persistent database write, Preview SSO bypass, or LINE send was performed in this checkpoint.
+
+## Checkpoint — 2026-10-30 19:21 Asia/Bangkok (read-only verification)
+
+This checkpoint adds fresh Production observations after the 2026-10-29 checkpoint could not resolve the Production hostname. It does not close a release gate.
+
+### PR #2 and exact-HEAD CI
+
+- PR #2 remains **open, Draft, and unmerged** (`mergeable: false` as reported by GitHub). Current head branch: `fix/linc-backend-clean-pr`; current HEAD: [`2dc989f704031f445f57055a6cd364e26c4f0469`](https://github.com/jaiioffice-svg/linc-tech-ex-backend/commit/2dc989f704031f445f57055a6cd364e26c4f0469).
+- The current HEAD commit is documentation-only and has parent [`1eb5ad10daf3d386c6693f3f528a14580c8993a0`](https://github.com/jaiioffice-svg/linc-tech-ex-backend/commit/1eb5ad10daf3d386c6693f3f528a14580c8993a0). No newer application-code commit exists on the Candidate branch.
+- GitHub Actions [run #598](https://github.com/jaiioffice-svg/linc-tech-ex-backend/actions/runs/40194244180) is associated with the exact current HEAD, event `push`, and completed `success`. Job steps show `npm ci`, dependency audit, six JavaScript syntax checks, and `npm test` all passed. Job logs report **124 tests passed / 0 failed**.
+- The preceding code/test commit [`1eb5ad10...`](https://github.com/jaiioffice-svg/linc-tech-ex-backend/commit/1eb5ad10daf3d386c6693f3f528a14580c8993a0) passed [run #597](https://github.com/jaiioffice-svg/linc-tech-ex-backend/actions/runs/40101588663) with 124/124 tests. Its additional 12-way JTI replay-concurrency test uses embedded PGlite/PostgreSQL and asserts one accepted consume, eleven rejections, and one replay row. This is embedded-database regression evidence, not a live Supabase RPC test.
+
+### Fresh Production GET checks
+
+Read-only GET requests to the Production alias completed on 2026-10-30:
+
+- `GET /health`: **HTTP 500**, `FUNCTION_INVOCATION_FAILED`, at 12:21:07 UTC (19:21:07 ICT); request ID `sin1::r6fhp-1793362865867-a10cbd6733eb`.
+- `GET /ready`: **HTTP 500**, `FUNCTION_INVOCATION_FAILED`, at 12:21:12 UTC (19:21:12 ICT); request ID `sin1::hgbl5-1793362871184-15cdb0d36d26`.
+- The latest Production deployment remains [`dpl_GDRLT35mJP9GVARVh6cMyKRoXnYB`](https://vercel.com/linc8/linc-tech-ex-backend/GDRLT35mJP9GVARVh6cMyKRoXnYB), from `main` SHA `758960a4e06cb79f3c243913859243fc9bdd9a67`, state `READY`. READY is not route-health proof.
+- A read-only inspection of `main/db.js` still shows `fs.writeFileSync(DB_FILE, ...)` at line 6 during module initialization, with `DB_FILE` set to `linc_data.json`. This is consistent with the previously confirmed `EROFS` root cause, but no fresh stack trace was recovered for the 2026-10-30 requests.
+- Vercel runtime-error aggregation returned no clusters for the last 24 hours. The seven-day aggregation returned three **historical** readiness-error groups from 2026-10-23, all `DB_PERMISSION_DENIED` / Supabase `42501`; they are not evidence about the current requests. Runtime-log queries for both new request IDs returned no records, and the 30-minute Production error-log query returned no records. Therefore the HTTP 500s are confirmed, but request-correlated runtime diagnosis remains unavailable.
+
+### Weighted estimate and next blocker
+
+- The fixed weighted estimate remains **29% complete / 71% remaining**. The six workstream weights and contributions above are unchanged. No release gate was completed by the documentation-only HEAD or by CI passing.
+- **Production blocker:** both health endpoints still fail with HTTP 500. The deployed `main/db.js` import-time filesystem write remains present; current request-specific stack evidence is unavailable.
+- **Next Candidate blocker:** identify the approved Client source and authoritative session store, then implement a trusted server-side BFF that validates the real session before minting the signed Backend assertion. Keep the identity guard fail-closed. Next, prove Preview Supabase isolation before any persistent migration or live CRUD/RPC test.
+
+No merge, deployment, rollback, Production configuration or secret change, secret decryption, database migration/write, Preview SSO bypass, or LINE message occurred in this checkpoint.
